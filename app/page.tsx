@@ -27,6 +27,21 @@ const [projects, setProjects] = useState<Project[]>([]);  const [selectedProject
   const [feedbackText, setFeedbackText] = useState("");
   const [showFinalHandoffModal, setShowFinalHandoffModal] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  if (isLoadingProjects) {
+  return (
+    <main className="min-h-screen bg-black p-10 text-white">
+      Loading projects...
+    </main>
+  );
+}
+
+if (projects.length === 0) {
+  return (
+    <main className="min-h-screen bg-black p-10 text-white">
+      No projects found.
+    </main>
+  );
+}
   const project = projects[selectedProjectIndex];
   const stages = project.stages;
   const selectedStage = stages[selectedStageIndex];
@@ -58,7 +73,9 @@ async function loadProjects() {
   }));
 
   setProjects(loadedProjects);
-  setIsLoadingProjects(false);
+setIsLoadingProjects(false);
+}
+
 useEffect(() => {
   loadProjects();
 }, []);
