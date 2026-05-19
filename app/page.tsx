@@ -1,13 +1,13 @@
 "use client";
 import { supabase } from "@/lib/supabase";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { PipelineView } from "@/components/pipeline/PipelineView";
 import { FinalHandoffConfirmModal } from "@/components/pipeline/FinalHandoffConfirmModal";
 import { AssetsView } from "@/components/assets/AssetsView";
 import { ApprovalsView } from "@/components/approvals/ApprovalsView";
 import { HandoffView } from "@/components/handoff/HandoffView";
-import { initialProjects } from "@/data/initialProjects";
+import { makeStages } from "@/data/initialProjects";
 import type { Project, ProjectTab, Stage } from "@/types/pipeline";
 import {
   approveStage as approveStageLogic,
@@ -20,20 +20,49 @@ import {
 } from "@/lib/pipelineLogic";
 
 export default function Home() {
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
+const [projects, setProjects] = useState<Project[]>([]);  const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
   const [activeProjectTab, setActiveProjectTab] =
     useState<ProjectTab>("pipeline");
   const [selectedStageIndex, setSelectedStageIndex] = useState(0);
   const [feedbackText, setFeedbackText] = useState("");
   const [showFinalHandoffModal, setShowFinalHandoffModal] = useState(false);
-
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const project = projects[selectedProjectIndex];
   const stages = project.stages;
   const selectedStage = stages[selectedStageIndex];
   const selectedStageBlocked = isStageBlocked(stages, selectedStageIndex);
   const finalHandoffCheck = getFinalHandoffCheck(stages);
-async function testDatabase() {
+async function loadProjects() {
+  setIsLoadingProjects(true);
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Failed to load projects:", error);
+    setIsLoadingProjects(false);
+    return;
+  }
+
+  const loadedProjects: Project[] = (data ?? []).map((row) => ({
+    id: row.id,
+    title: row.name,
+    description: row.description ?? "",
+    director: "Ranjit",
+    format: "9:16 Short Ad",
+    mode: "Hybrid AI Production",
+    stages: makeStages("coffee"),
+    assets: [],
+  }));
+
+  setProjects(loadedProjects);
+  setIsLoadingProjects(false);
+useEffect(() => {
+  loadProjects();
+}, []);
+  async function testDatabase() {
   const { data, error } = await supabase.from("projects").insert([
     {
       name: "Test Project",
@@ -44,6 +73,63 @@ async function testDatabase() {
 
   console.log("data:", data);
   console.log("error:", error);
+}
+async function createNewProject() {
+  const { data, error } = await supabase
+    .from("projects")
+    .insert({
+      name: "Untitled Project",
+      description: "New GenAI video production project",
+      status: "active",
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to create project:", error);
+    return;
+  }
+
+  const newProject: Project = {
+    id: data.id,
+    title: data.name,
+    description: data.description ?? "",
+    director: "Ranjit",
+    format: "9:16 Short Ad",
+    mode: "Hybrid AI Production",
+    stages: makeStages("coffee"),
+    assets: [],
+  };
+
+  setProjects((currentProjects) => [...currentProjects, newProject]);
+  setSelectedProjectIndex(projects.length);
+  setSelectedStageIndex(0);
+  setActiveProjectTab("pipeline");
+}
+async function deleteCurrentProject() {
+  const currentProject = projects[selectedProjectIndex];
+
+  if (!currentProject?.id) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("projects")
+    .delete()
+    .eq("id", currentProject.id);
+
+  if (error) {
+    console.error("Failed to delete project:", error);
+    return;
+  }
+
+  const remainingProjects = projects.filter(
+    (_, index) => index !== selectedProjectIndex
+  );
+
+  setProjects(remainingProjects);
+  setSelectedProjectIndex(0);
+  setSelectedStageIndex(0);
 }
   function updateCurrentProjectStages(nextStages: Stage[]) {
     setProjects((currentProjects) =>
