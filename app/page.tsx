@@ -20,6 +20,22 @@ import {
   takeDirectorControl as takeDirectorControlLogic,
 } from "@/lib/pipelineLogic";
 
+function makeFreshStages(): Stage[] {
+  return makeStages("coffee").map((stage, index) => ({
+    ...stage,
+    status: index === 0 ? "Waiting" : "Locked",
+    versions: [],
+    notes:
+      index === 0
+        ? "Fresh project created. Concept is ready for director input."
+        : "Locked until earlier stages are approved.",
+  }));
+}
+
+function normalizeProjectName(name: string) {
+  return name.trim().replace(/\s+/g, " ");
+}
+
 export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
@@ -51,7 +67,7 @@ export default function Home() {
       director: "Ranjit",
       format: "9:16 Short Ad",
       mode: "Hybrid AI Production",
-      stages: makeStages("coffee"),
+      stages: makeFreshStages(),
       assets: [],
     }));
 
@@ -83,6 +99,29 @@ export default function Home() {
 
   const finalHandoffCheck = getFinalHandoffCheck(stages);
 
+  function validateProjectName(nextName: string, currentProjectId?: string) {
+    const cleanName = normalizeProjectName(nextName);
+
+    if (cleanName.length < 5) {
+      window.alert("Project name must be at least 5 characters.");
+      return null;
+    }
+
+    const duplicate = projects.some(
+      (item) =>
+        item.id !== currentProjectId &&
+        normalizeProjectName(item.title).toLowerCase() ===
+          cleanName.toLowerCase()
+    );
+
+    if (duplicate) {
+      window.alert("A project with this name already exists.");
+      return null;
+    }
+
+    return cleanName;
+  }
+
   async function testDatabase() {
     const { data, error } = await supabase.from("projects").insert([
       {
@@ -97,10 +136,18 @@ export default function Home() {
   }
 
   async function createNewProject() {
+    const rawName = window.prompt("Enter project name:");
+
+    if (!rawName) return;
+
+    const cleanName = validateProjectName(rawName);
+
+    if (!cleanName) return;
+
     const { data, error } = await supabase
       .from("projects")
       .insert({
-        name: "Untitled Project",
+        name: cleanName,
         description: "New GenAI video production project",
         status: "active",
       })
@@ -119,7 +166,7 @@ export default function Home() {
       director: "Ranjit",
       format: "9:16 Short Ad",
       mode: "Hybrid AI Production",
-      stages: makeStages("coffee"),
+      stages: makeFreshStages(),
       assets: [],
     };
 
@@ -132,8 +179,50 @@ export default function Home() {
     setActiveProjectTab("pipeline");
   }
 
+  async function renameCurrentProject() {
+    if (!project?.id) {
+      console.error("Cannot rename: project has no id", project);
+      return;
+    }
+
+    const rawName = window.prompt("Project name:", project.title);
+
+    if (!rawName) return;
+
+    const cleanName = validateProjectName(rawName, project.id);
+
+    if (!cleanName) return;
+
+    const { data, error } = await supabase
+      .from("projects")
+      .update({ name: cleanName })
+      .eq("id", project.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Failed to rename project:", error);
+      return;
+    }
+
+    setProjects((currentProjects) =>
+      currentProjects.map((item) =>
+        item.id === project.id ? { ...item, title: data.name } : item
+      )
+    );
+  }
+
   async function deleteCurrentProject() {
-    if (!project?.id) return;
+    if (!project?.id) {
+      console.error("Cannot delete: project has no id", project);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${project.title}"? This cannot be undone.`
+    );
+
+    if (!confirmed) return;
 
     const { error } = await supabase
       .from("projects")
@@ -145,10 +234,9 @@ export default function Home() {
       return;
     }
 
-    setProjects((currentProjects) =>
-      currentProjects.filter((item) => item.id !== project.id)
-    );
+    const remainingProjects = projects.filter((item) => item.id !== project.id);
 
+    setProjects(remainingProjects);
     setSelectedProjectIndex(0);
     setSelectedStageIndex(0);
     setActiveProjectTab("pipeline");
@@ -302,6 +390,7 @@ export default function Home() {
         activeProjectTab={activeProjectTab}
         onSwitchProject={switchProject}
         onSetTab={setActiveProjectTab}
+        onCreateProject={createNewProject}
       />
 
       <section className="flex-1 p-6">
@@ -318,6 +407,13 @@ export default function Home() {
             className="rounded-xl bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
           >
             New Project
+          </button>
+
+          <button
+            onClick={renameCurrentProject}
+            className="rounded-xl bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
+          >
+            Rename Project
           </button>
 
           <button
