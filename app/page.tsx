@@ -1,4 +1,5 @@
 "use client";
+
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -20,135 +21,139 @@ import {
 } from "@/lib/pipelineLogic";
 
 export default function Home() {
-const [projects, setProjects] = useState<Project[]>([]);  const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
   const [activeProjectTab, setActiveProjectTab] =
     useState<ProjectTab>("pipeline");
   const [selectedStageIndex, setSelectedStageIndex] = useState(0);
   const [feedbackText, setFeedbackText] = useState("");
   const [showFinalHandoffModal, setShowFinalHandoffModal] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
-  
-  const project = projects[selectedProjectIndex];
-  const stages = project.stages;
-  const selectedStage = stages[selectedStageIndex];
-  const selectedStageBlocked = isStageBlocked(stages, selectedStageIndex);
-  const finalHandoffCheck = getFinalHandoffCheck(stages);
-async function loadProjects() {
-  setIsLoadingProjects(true);
 
-  const { data, error } = await supabase
-    .from("projects")
-    .select("*")
-    .order("created_at", { ascending: true });
+  async function loadProjects() {
+    setIsLoadingProjects(true);
 
-  if (error) {
-    console.error("Failed to load projects:", error);
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Failed to load projects:", error);
+      setIsLoadingProjects(false);
+      return;
+    }
+
+    const loadedProjects: Project[] = (data ?? []).map((row) => ({
+      id: row.id,
+      title: row.name,
+      description: row.description ?? "",
+      director: "Ranjit",
+      format: "9:16 Short Ad",
+      mode: "Hybrid AI Production",
+      stages: makeStages("coffee"),
+      assets: [],
+    }));
+
+    setProjects(loadedProjects);
+    setSelectedProjectIndex(0);
+    setSelectedStageIndex(0);
     setIsLoadingProjects(false);
-    return;
   }
 
-  const loadedProjects: Project[] = (data ?? []).map((row) => ({
-    id: row.id,
-    title: row.name,
-    description: row.description ?? "",
-    director: "Ranjit",
-    format: "9:16 Short Ad",
-    mode: "Hybrid AI Production",
-    stages: makeStages("coffee"),
-    assets: [],
-  }));
+  useEffect(() => {
+    loadProjects();
+  }, []);
 
-  setProjects(loadedProjects);
-setIsLoadingProjects(false);
-}
+  const project =
+    selectedProjectIndex >= 0 && selectedProjectIndex < projects.length
+      ? projects[selectedProjectIndex]
+      : null;
 
-useEffect(() => {
-  loadProjects();
-}, []);
-if (isLoadingProjects) {
-  return (
-    <main className="min-h-screen bg-black p-10 text-white">
-      Loading projects...
-    </main>
-  );
-}
+  const stages = project?.stages ?? [];
 
-if (projects.length === 0) {
-  return (
-    <main className="min-h-screen bg-black p-10 text-white">
-      No projects found.
-    </main>
-  );
-}
+  const selectedStage =
+    selectedStageIndex >= 0 && selectedStageIndex < stages.length
+      ? stages[selectedStageIndex]
+      : null;
+
+  const selectedStageBlocked = selectedStage
+    ? isStageBlocked(stages, selectedStageIndex)
+    : true;
+
+  const finalHandoffCheck = getFinalHandoffCheck(stages);
+
   async function testDatabase() {
-  const { data, error } = await supabase.from("projects").insert([
-    {
-      name: "Test Project",
-      description: "Supabase connection working",
-      status: "active",
-    },
-  ]);
+    const { data, error } = await supabase.from("projects").insert([
+      {
+        name: "Test Project",
+        description: "Supabase connection working",
+        status: "active",
+      },
+    ]);
 
-  console.log("data:", data);
-  console.log("error:", error);
-}
-async function createNewProject() {
-  const { data, error } = await supabase
-    .from("projects")
-    .insert({
-      name: "Untitled Project",
-      description: "New GenAI video production project",
-      status: "active",
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Failed to create project:", error);
-    return;
+    console.log("data:", data);
+    console.log("error:", error);
   }
 
-  const newProject: Project = {
-    id: data.id,
-    title: data.name,
-    description: data.description ?? "",
-    director: "Ranjit",
-    format: "9:16 Short Ad",
-    mode: "Hybrid AI Production",
-    stages: makeStages("coffee"),
-    assets: [],
-  };
+  async function createNewProject() {
+    const { data, error } = await supabase
+      .from("projects")
+      .insert({
+        name: "Untitled Project",
+        description: "New GenAI video production project",
+        status: "active",
+      })
+      .select()
+      .single();
 
-  setProjects((currentProjects) => [...currentProjects, newProject]);
-  setSelectedProjectIndex(projects.length);
-  setSelectedStageIndex(0);
-  setActiveProjectTab("pipeline");
-}
-async function deleteCurrentProject() {
-  const currentProject = projects[selectedProjectIndex];
+    if (error) {
+      console.error("Failed to create project:", error);
+      return;
+    }
 
-  if (!currentProject?.id) {
-    return;
+    const newProject: Project = {
+      id: data.id,
+      title: data.name,
+      description: data.description ?? "",
+      director: "Ranjit",
+      format: "9:16 Short Ad",
+      mode: "Hybrid AI Production",
+      stages: makeStages("coffee"),
+      assets: [],
+    };
+
+    setProjects((currentProjects) => {
+      setSelectedProjectIndex(currentProjects.length);
+      return [...currentProjects, newProject];
+    });
+
+    setSelectedStageIndex(0);
+    setActiveProjectTab("pipeline");
   }
 
-  const { error } = await supabase
-    .from("projects")
-    .delete()
-    .eq("id", currentProject.id);
+  async function deleteCurrentProject() {
+    if (!project?.id) return;
 
-  if (error) {
-    console.error("Failed to delete project:", error);
-    return;
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", project.id);
+
+    if (error) {
+      console.error("Failed to delete project:", error);
+      return;
+    }
+
+    setProjects((currentProjects) =>
+      currentProjects.filter((item) => item.id !== project.id)
+    );
+
+    setSelectedProjectIndex(0);
+    setSelectedStageIndex(0);
+    setActiveProjectTab("pipeline");
   }
 
-  const remainingProjects = projects.filter(
-    (_, index) => index !== selectedProjectIndex
-  );
-
-  setProjects(remainingProjects);
-  setSelectedProjectIndex(0);
-  setSelectedStageIndex(0);
-}
   function updateCurrentProjectStages(nextStages: Stage[]) {
     setProjects((currentProjects) =>
       currentProjects.map((item, index) =>
@@ -158,7 +163,7 @@ async function deleteCurrentProject() {
   }
 
   function approveStage() {
-    if (selectedStageBlocked) return;
+    if (!selectedStage || selectedStageBlocked) return;
 
     if (selectedStage.title === "Final Edit Handoff") {
       setShowFinalHandoffModal(true);
@@ -172,6 +177,8 @@ async function deleteCurrentProject() {
   }
 
   function confirmFinalHandoffApproval() {
+    if (!selectedStage) return;
+
     updateCurrentProjectStages(
       approveStageLogic(stages, selectedStageIndex, feedbackText)
     );
@@ -180,7 +187,7 @@ async function deleteCurrentProject() {
   }
 
   function rejectLatestVersion() {
-    if (selectedStageBlocked) return;
+    if (!selectedStage || selectedStageBlocked) return;
 
     updateCurrentProjectStages(
       rejectLatestVersionLogic(stages, selectedStageIndex, feedbackText)
@@ -189,7 +196,7 @@ async function deleteCurrentProject() {
   }
 
   function submitNewVersion() {
-    if (selectedStageBlocked) return;
+    if (!selectedStage || selectedStageBlocked) return;
 
     updateCurrentProjectStages(
       submitNewVersionLogic(stages, selectedStageIndex, feedbackText)
@@ -198,13 +205,19 @@ async function deleteCurrentProject() {
   }
 
   function takeDirectorControl() {
+    if (!selectedStage) return;
+
     updateCurrentProjectStages(
       takeDirectorControlLogic(stages, selectedStageIndex)
     );
   }
 
   function assignBackToWorker() {
-    updateCurrentProjectStages(assignBackToWorkerLogic(stages, selectedStageIndex));
+    if (!selectedStage) return;
+
+    updateCurrentProjectStages(
+      assignBackToWorkerLogic(stages, selectedStageIndex)
+    );
   }
 
   function openStage(index: number) {
@@ -220,13 +233,39 @@ async function deleteCurrentProject() {
     setShowFinalHandoffModal(false);
   }
 
+  if (isLoadingProjects) {
+    return <main className="p-6 text-white">Loading projects...</main>;
+  }
+
+  if (!project) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-black text-white">
+        <div className="text-center">
+          <p className="text-lg font-semibold">No projects found.</p>
+          <button
+            onClick={createNewProject}
+            className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-medium text-black"
+          >
+            Create New Project
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (!selectedStage) {
+    return <main className="p-6 text-white">No stage selected.</main>;
+  }
+
+  const activeProject: Project = project;
+
   function renderProjectTab() {
     if (activeProjectTab === "pipeline") {
       return (
         <PipelineView
-          project={project}
+          project={activeProject}
           stages={stages}
-          assets={project.assets}
+          assets={activeProject.assets}
           selectedStageIndex={selectedStageIndex}
           feedbackText={feedbackText}
           onSelectStage={setSelectedStageIndex}
@@ -241,22 +280,22 @@ async function deleteCurrentProject() {
     }
 
     if (activeProjectTab === "assets") {
-      return <AssetsView project={project} />;
+      return <AssetsView project={activeProject} />;
     }
 
     if (activeProjectTab === "approvals") {
-      return <ApprovalsView project={project} onOpenStage={openStage} />;
+      return <ApprovalsView project={activeProject} onOpenStage={openStage} />;
     }
 
     if (activeProjectTab === "handoff") {
-      return <HandoffView project={project} />;
+      return <HandoffView project={activeProject} />;
     }
 
     return null;
   }
 
   return (
-    <main className="min-h-screen bg-black text-white flex">
+    <main className="flex min-h-screen bg-black text-white">
       <Sidebar
         projects={projects}
         selectedProjectIndex={selectedProjectIndex}
@@ -264,13 +303,33 @@ async function deleteCurrentProject() {
         onSwitchProject={switchProject}
         onSetTab={setActiveProjectTab}
       />
-<button
-  onClick={testDatabase}
-  className="fixed bottom-6 right-6 z-50 bg-green-900 border border-green-700 px-4 py-3 rounded-xl"
->
-  Test Database
-</button>
-      <section className="flex-1 p-10">{renderProjectTab()}</section>
+
+      <section className="flex-1 p-6">
+        <div className="mb-4 flex gap-3">
+          <button
+            onClick={testDatabase}
+            className="rounded-xl bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
+          >
+            Test Database
+          </button>
+
+          <button
+            onClick={createNewProject}
+            className="rounded-xl bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
+          >
+            New Project
+          </button>
+
+          <button
+            onClick={deleteCurrentProject}
+            className="rounded-xl bg-red-900 px-4 py-2 text-sm hover:bg-red-800"
+          >
+            Delete Project
+          </button>
+        </div>
+
+        {renderProjectTab()}
+      </section>
 
       {showFinalHandoffModal && (
         <FinalHandoffConfirmModal
