@@ -1,65 +1,180 @@
-import Image from "next/image";
+"use client";
+import { supabase } from "@/lib/supabase";
+import { useState } from "react";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { PipelineView } from "@/components/pipeline/PipelineView";
+import { FinalHandoffConfirmModal } from "@/components/pipeline/FinalHandoffConfirmModal";
+import { AssetsView } from "@/components/assets/AssetsView";
+import { ApprovalsView } from "@/components/approvals/ApprovalsView";
+import { HandoffView } from "@/components/handoff/HandoffView";
+import { initialProjects } from "@/data/initialProjects";
+import type { Project, ProjectTab, Stage } from "@/types/pipeline";
+import {
+  approveStage as approveStageLogic,
+  assignBackToWorker as assignBackToWorkerLogic,
+  getFinalHandoffCheck,
+  isStageBlocked,
+  rejectLatestVersion as rejectLatestVersionLogic,
+  submitNewVersion as submitNewVersionLogic,
+  takeDirectorControl as takeDirectorControlLogic,
+} from "@/lib/pipelineLogic";
 
 export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
+  const [activeProjectTab, setActiveProjectTab] =
+    useState<ProjectTab>("pipeline");
+  const [selectedStageIndex, setSelectedStageIndex] = useState(0);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [showFinalHandoffModal, setShowFinalHandoffModal] = useState(false);
+
+  const project = projects[selectedProjectIndex];
+  const stages = project.stages;
+  const selectedStage = stages[selectedStageIndex];
+  const selectedStageBlocked = isStageBlocked(stages, selectedStageIndex);
+  const finalHandoffCheck = getFinalHandoffCheck(stages);
+async function testDatabase() {
+  const { data, error } = await supabase.from("projects").insert([
+    {
+      name: "Test Project",
+      description: "Supabase connection working",
+      status: "active",
+    },
+  ]);
+
+  console.log("data:", data);
+  console.log("error:", error);
+}
+  function updateCurrentProjectStages(nextStages: Stage[]) {
+    setProjects((currentProjects) =>
+      currentProjects.map((item, index) =>
+        index === selectedProjectIndex ? { ...item, stages: nextStages } : item
+      )
+    );
+  }
+
+  function approveStage() {
+    if (selectedStageBlocked) return;
+
+    if (selectedStage.title === "Final Edit Handoff") {
+      setShowFinalHandoffModal(true);
+      return;
+    }
+
+    updateCurrentProjectStages(
+      approveStageLogic(stages, selectedStageIndex, feedbackText)
+    );
+    setFeedbackText("");
+  }
+
+  function confirmFinalHandoffApproval() {
+    updateCurrentProjectStages(
+      approveStageLogic(stages, selectedStageIndex, feedbackText)
+    );
+    setFeedbackText("");
+    setShowFinalHandoffModal(false);
+  }
+
+  function rejectLatestVersion() {
+    if (selectedStageBlocked) return;
+
+    updateCurrentProjectStages(
+      rejectLatestVersionLogic(stages, selectedStageIndex, feedbackText)
+    );
+    setFeedbackText("");
+  }
+
+  function submitNewVersion() {
+    if (selectedStageBlocked) return;
+
+    updateCurrentProjectStages(
+      submitNewVersionLogic(stages, selectedStageIndex, feedbackText)
+    );
+    setFeedbackText("");
+  }
+
+  function takeDirectorControl() {
+    updateCurrentProjectStages(
+      takeDirectorControlLogic(stages, selectedStageIndex)
+    );
+  }
+
+  function assignBackToWorker() {
+    updateCurrentProjectStages(assignBackToWorkerLogic(stages, selectedStageIndex));
+  }
+
+  function openStage(index: number) {
+    setSelectedStageIndex(index);
+    setActiveProjectTab("pipeline");
+  }
+
+  function switchProject(index: number) {
+    setSelectedProjectIndex(index);
+    setSelectedStageIndex(0);
+    setActiveProjectTab("pipeline");
+    setFeedbackText("");
+    setShowFinalHandoffModal(false);
+  }
+
+  function renderProjectTab() {
+    if (activeProjectTab === "pipeline") {
+      return (
+        <PipelineView
+          project={project}
+          stages={stages}
+          assets={project.assets}
+          selectedStageIndex={selectedStageIndex}
+          feedbackText={feedbackText}
+          onSelectStage={setSelectedStageIndex}
+          onFeedbackChange={setFeedbackText}
+          onTakeDirectorControl={takeDirectorControl}
+          onAssignBackToWorker={assignBackToWorker}
+          onSubmitNewVersion={submitNewVersion}
+          onApproveStage={approveStage}
+          onRejectLatestVersion={rejectLatestVersion}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      );
+    }
+
+    if (activeProjectTab === "assets") {
+      return <AssetsView project={project} />;
+    }
+
+    if (activeProjectTab === "approvals") {
+      return <ApprovalsView project={project} onOpenStage={openStage} />;
+    }
+
+    if (activeProjectTab === "handoff") {
+      return <HandoffView project={project} />;
+    }
+
+    return null;
+  }
+
+  return (
+    <main className="min-h-screen bg-black text-white flex">
+      <Sidebar
+        projects={projects}
+        selectedProjectIndex={selectedProjectIndex}
+        activeProjectTab={activeProjectTab}
+        onSwitchProject={switchProject}
+        onSetTab={setActiveProjectTab}
+      />
+<button
+  onClick={testDatabase}
+  className="fixed bottom-6 right-6 z-50 bg-green-900 border border-green-700 px-4 py-3 rounded-xl"
+>
+  Test Database
+</button>
+      <section className="flex-1 p-10">{renderProjectTab()}</section>
+
+      {showFinalHandoffModal && (
+        <FinalHandoffConfirmModal
+          check={finalHandoffCheck}
+          onCancel={() => setShowFinalHandoffModal(false)}
+          onConfirm={confirmFinalHandoffApproval}
+        />
+      )}
+    </main>
   );
 }
