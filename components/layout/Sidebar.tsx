@@ -45,7 +45,7 @@ export function Sidebar({
               <p className="font-semibold">{item.title}</p>
 
               <p className="text-xs text-zinc-500 mt-1">
-                {item.format}
+                {item.description || "New project"}
               </p>
             </button>
           ))}

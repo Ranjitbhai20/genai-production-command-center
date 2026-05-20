@@ -46,9 +46,9 @@ export type Project = {
   id?: string;
   title: string;
   description: string;
-  director: string;
-  format: string;
-  mode: string;
+  director?: string;
+  format?: string;
+  mode?: string;
   stages: Stage[];
   assets: Asset[];
 };
