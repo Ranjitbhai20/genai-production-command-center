@@ -1,4 +1,4 @@
-import type { Asset, Project, ProjectStatus, Stage } from "@/types/pipeline";
+import type { Asset, Project, Stage } from "@/types/pipeline";
 import { ProjectHeader } from "@/components/project/ProjectHeader";
 import { StageList } from "@/components/pipeline/StageList";
 import { StageDetailPanel } from "@/components/pipeline/StageDetailPanel";
@@ -42,64 +42,41 @@ export function PipelineView({
     (stage) => stage.status === "Needs Revalidation"
   ).length;
 
-  const finalHandoffApproved = stages.some(
-    (stage) =>
-      stage.title === "Final Edit Handoff" && stage.status === "Approved"
-  );
-
-  const projectIsArchived =
-    project.status === "complete" && finalHandoffApproved;
-
-  const panelProjectStatus: ProjectStatus = projectIsArchived
-    ? "complete"
-    : project.status === "complete"
-    ? "in_production"
-    : project.status;
+  const archived = project.status === "complete";
 
   return (
     <div>
       <ProjectHeader project={project} />
 
-      {project.status === "complete" && !finalHandoffApproved && (
-        <div className="mb-8 rounded-2xl border border-yellow-800 bg-yellow-950/40 p-5 text-yellow-200">
-          <p className="text-sm font-semibold">Status Mismatch Detected</p>
-          <p className="mt-2 text-sm text-yellow-300">
-            This project is marked complete in the database, but the final
-            handoff stage is not approved in the current stage state. The
-            pipeline remains editable until stage persistence is added.
-          </p>
-        </div>
-      )}
-
-      {projectIsArchived && (
-        <div className="mb-8 rounded-2xl border border-zinc-700 bg-zinc-900 p-5 text-zinc-300">
+      {archived && (
+        <div className="mb-8 rounded-2xl border border-zinc-700 bg-zinc-900 p-5">
           <p className="text-sm font-semibold text-white">
             Production Archived
           </p>
           <p className="mt-2 text-sm text-zinc-400">
-            Final handoff is complete. The production record is now read-only
-            and preserved for database lookup.
+            Final handoff is complete. This production is now preserved as a
+            read-only database record.
           </p>
         </div>
       )}
 
       <div className="mb-10 grid grid-cols-4 gap-4">
-        <MetricCard label="Total Stages" value={stages.length} />
+        <MetricCard label="Stages" value={stages.length} />
         <MetricCard label="Approved" value={approvedCount} />
         <MetricCard label="Submitted" value={submittedCount} />
-        <MetricCard label="Needs Revalidation" value={revalidationCount} />
+        <MetricCard label="Revalidation" value={revalidationCount} />
       </div>
 
       <div className="mb-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
-        <p className="mb-2 text-sm text-zinc-500">Project Logic</p>
+        <p className="mb-2 text-sm text-zinc-500">Production Logic</p>
         <p className="text-zinc-300">
-          The approved brief initializes production. Script approval unlocks the
-          production floor. Worker assignment, asset intake, version history,
-          approvals, and final handoff are preserved as production memory.
+          Brief approval unlocks the pipeline. Script approval unlocks the
+          production floor. Stage submissions, approvals, rejections, and final
+          handoff are preserved as production memory.
         </p>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_420px] items-start gap-6">
+      <div className="grid grid-cols-[minmax(0,1fr)_380px] items-start gap-6">
         <StageList
           stages={stages}
           selectedStageIndex={selectedStageIndex}
@@ -107,7 +84,7 @@ export function PipelineView({
         />
 
         <StageDetailPanel
-          projectStatus={panelProjectStatus}
+          projectStatus={project.status}
           stages={stages}
           selectedStageIndex={selectedStageIndex}
           assets={assets}
