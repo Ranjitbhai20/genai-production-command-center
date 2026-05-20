@@ -20,47 +20,40 @@ export type FinalHandoffCheck = {
 };
 
 export function isStageBlocked(stages: Stage[], index: number) {
-  const conceptApproved = stages[0]?.status === "Approved";
-  const scriptApproved = stages[1]?.status === "Approved";
   const stage = stages[index];
+  const scriptApproved = stages[0]?.status === "Approved";
 
+  if (!stage) return true;
   if (index === 0) return false;
-
-  if (index === 1) {
-    return !conceptApproved;
-  }
-
-  if (index >= 2 && !scriptApproved) {
-    return true;
-  }
 
   if (stage.title === "Final Edit Handoff") {
     const check = getFinalHandoffCheck(stages);
     return !check.canAttemptHandoff;
   }
 
+  if (index >= 1 && !scriptApproved) {
+    return true;
+  }
+
   return false;
 }
 
 export function blockedReason(stages: Stage[], index: number) {
-  const conceptApproved = stages[0]?.status === "Approved";
-  const scriptApproved = stages[1]?.status === "Approved";
   const stage = stages[index];
+  const scriptApproved = stages[0]?.status === "Approved";
 
-  if (index === 1 && !conceptApproved) {
-    return "Blocked: Concept must be approved before Script unlocks.";
-  }
-
-  if (index >= 2 && !scriptApproved) {
-    return "Blocked: Script must be approved before production floor unlocks.";
-  }
+  if (!stage) return "Blocked: stage does not exist.";
 
   if (stage.title === "Final Edit Handoff") {
     const check = getFinalHandoffCheck(stages);
 
     if (!check.canAttemptHandoff) {
-      return "Blocked: Final Edit Handoff requires at least one approved visual production stage. Audio + Text alone is not enough.";
+      return "Blocked: Final Edit Handoff requires at least one approved visual production stage.";
     }
+  }
+
+  if (index >= 1 && !scriptApproved) {
+    return "Blocked: Script must be approved before production floor unlocks.";
   }
 
   return "";
@@ -98,39 +91,41 @@ export function approveStage(
   return stages.map((stage, index) => {
     if (index === selectedStageIndex) {
       const feedback =
-        feedbackText.trim() || "Director approved this latest version.";
+        feedbackText.trim() || "Project owner approved the latest version.";
 
-      const versions = stage.versions.map((version, versionIndex) =>
-        versionIndex === stage.versions.length - 1
-          ? { ...version, status: "Approved" as const, feedback }
-          : version
-      );
+      const versions =
+        stage.versions.length > 0
+          ? stage.versions.map((version, versionIndex) =>
+              versionIndex === stage.versions.length - 1
+                ? { ...version, status: "Approved" as const, feedback }
+                : version
+            )
+          : [
+              {
+                label: "v1",
+                status: "Approved" as const,
+                feedback,
+                submittedBy: stage.assignedWorker || "Project Owner",
+              },
+            ];
 
-      return { ...stage, status: "Approved" as const, versions };
-    }
-
-    if (
-      selectedStageIndex === 0 &&
-      index === 1 &&
-      stage.status !== "Approved"
-    ) {
       return {
         ...stage,
-        status: "Waiting" as const,
-        notes: "Concept is approved. Script can now be revised or submitted.",
+        status: "Approved" as const,
+        versions,
       };
     }
 
     if (
-      selectedStageIndex === 1 &&
-      index >= 2 &&
+      selectedStageIndex === 0 &&
+      index >= 1 &&
       (stage.status === "Locked" || stage.status === "Needs Revalidation")
     ) {
       return {
         ...stage,
         status: "Waiting" as const,
         notes:
-          "Script is approved. Director can now review, approve, revise, or continue this stage.",
+          "Script is approved. Project owner can now assign, review, approve, revise, or continue this stage.",
       };
     }
 
@@ -144,17 +139,31 @@ export function rejectLatestVersion(
   feedbackText: string
 ) {
   const feedback =
-    feedbackText.trim() || "Director rejected this version. Revision needed.";
+    feedbackText.trim() || "Project owner rejected this version. Revision needed.";
 
   return stages.map((stage, index) => {
     if (index === selectedStageIndex) {
-      const versions = stage.versions.map((version, versionIndex) =>
-        versionIndex === stage.versions.length - 1
-          ? { ...version, status: "Rejected" as const, feedback }
-          : version
-      );
+      const versions =
+        stage.versions.length > 0
+          ? stage.versions.map((version, versionIndex) =>
+              versionIndex === stage.versions.length - 1
+                ? { ...version, status: "Rejected" as const, feedback }
+                : version
+            )
+          : [
+              {
+                label: "v1",
+                status: "Rejected" as const,
+                feedback,
+                submittedBy: stage.assignedWorker || "Project Owner",
+              },
+            ];
 
-      return { ...stage, status: "Rejected" as const, versions };
+      return {
+        ...stage,
+        status: "Rejected" as const,
+        versions,
+      };
     }
 
     if (selectedStageIndex === 0 && index >= 1) {
@@ -162,16 +171,7 @@ export function rejectLatestVersion(
         ...stage,
         status: "Needs Revalidation" as const,
         notes:
-          "Concept changed or was rejected. Existing work is saved, but director must revalidate before continuing.",
-      };
-    }
-
-    if (selectedStageIndex === 1 && index >= 2) {
-      return {
-        ...stage,
-        status: "Needs Revalidation" as const,
-        notes:
-          "Script changed or was rejected. Existing work is saved, but director must revalidate before continuing.",
+          "Script changed or was rejected. Existing work is saved, but project owner must revalidate before continuing.",
       };
     }
 
@@ -198,49 +198,43 @@ export function submitNewVersion(
           label: `v${nextVersionNumber}`,
           status: "Submitted" as const,
           feedback:
-            feedbackText.trim() || "New version submitted for director review.",
-          submittedBy: stage.assignedWorker,
+            feedbackText.trim() || "New version submitted for project owner review.",
+          submittedBy: stage.assignedWorker || "Project Owner",
         },
       ],
     };
   });
 }
 
-export function takeDirectorControl(
-  stages: Stage[],
-  selectedStageIndex: number
-) {
+export function takeDirectorControl(stages: Stage[], selectedStageIndex: number) {
   return stages.map((stage, index) =>
     index === selectedStageIndex
       ? {
           ...stage,
-          owner: "Director",
+          owner: "Project Owner",
           executionMode: "Self-managed",
-          assignedWorker: "Ranjit",
+          assignedWorker: "Not assigned",
           accessLevel: "Full control",
           taskBrief:
-            "Director has taken control of this stage while preserving all previous worker submissions.",
+            "Project owner has taken control of this stage while preserving all previous worker submissions.",
         }
       : stage
   );
 }
 
-export function assignBackToWorker(
-  stages: Stage[],
-  selectedStageIndex: number
-) {
+export function assignBackToWorker(stages: Stage[], selectedStageIndex: number) {
   return stages.map((stage, index) =>
     index === selectedStageIndex
       ? {
           ...stage,
           owner: stage.defaultWorker,
           executionMode: "Assigned to worker",
-          assignedWorker: stage.defaultWorker,
+          assignedWorker: "Not assigned",
           accessLevel:
             stage.defaultWorker === "AI Operator"
               ? "Upload + comment only"
               : "Submit versions only",
-          taskBrief: `Assigned to ${stage.defaultWorker}. Worker can submit versions; director keeps approval authority.`,
+          taskBrief: `Ready to assign to ${stage.defaultWorker}. Worker can submit versions; project owner keeps approval authority.`,
         }
       : stage
   );

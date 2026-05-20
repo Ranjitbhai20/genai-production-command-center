@@ -6,9 +6,46 @@ export type StageStatus =
   | "Waiting"
   | "Locked";
 
-export type ProjectTab = "pipeline" | "assets" | "approvals" | "handoff" | "projects";
+export type ProjectTab = "brief" | "pipeline" | "assets" | "approvals" | "handoff";
 
-export type ProjectType = "coffee" | "custody";
+export type ProjectStatus = "draft" | "in_production" | "complete";
+
+export type ProjectType =
+  | "Advertisement"
+  | "Social Media Short"
+  | "Product Showcase"
+  | "Music Video"
+  | "Short Film"
+  | "Documentary"
+  | "Tutorial"
+  | "Hybrid Live Action"
+  | "Other";
+
+export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "Other";
+
+export type RuntimeTarget =
+  | "<10 sec"
+  | "10-20 sec"
+  | "20-40 sec"
+  | "40-60 sec"
+  | "1-3 min"
+  | "3-10 min"
+  | ">10 min";
+
+export type WorkflowMode =
+  | "Solo Production"
+  | "Team Production"
+  | "Hybrid"
+  | "API Assisted";
+
+export type VisualStyle =
+  | "AI Generated"
+  | "Hybrid AI"
+  | "Live Action"
+  | "Stylized"
+  | "Photoreal"
+  | "Animation"
+  | "Mixed";
 
 export type Version = {
   label: string;
@@ -42,13 +79,30 @@ export type Asset = {
   source: string;
 };
 
+export type ProjectBriefInput = {
+  ownerName: string;
+  projectType: ProjectType;
+  aspectRatio: AspectRatio;
+  runtimeTarget: RuntimeTarget;
+  workflowMode: WorkflowMode;
+  visualStyle: VisualStyle;
+  conceptSummary: string;
+  additionalInfo: string;
+};
+
 export type Project = {
   id?: string;
   title: string;
   description: string;
-  director?: string;
-  format?: string;
-  mode?: string;
+  status: ProjectStatus;
+  ownerName: string;
+  projectType: ProjectType;
+  aspectRatio: AspectRatio;
+  runtimeTarget: RuntimeTarget;
+  workflowMode: WorkflowMode;
+  visualStyle: VisualStyle;
+  conceptSummary: string;
+  additionalInfo: string;
   stages: Stage[];
   assets: Asset[];
 };

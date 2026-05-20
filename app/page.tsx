@@ -3,13 +3,15 @@
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { DataViewButton } from "@/components/layout/DataViewButton";
+import { BriefView } from "@/components/brief/BriefView";
 import { PipelineView } from "@/components/pipeline/PipelineView";
 import { FinalHandoffConfirmModal } from "@/components/pipeline/FinalHandoffConfirmModal";
 import { AssetsView } from "@/components/assets/AssetsView";
 import { ApprovalsView } from "@/components/approvals/ApprovalsView";
 import { HandoffView } from "@/components/handoff/HandoffView";
 import { makeStages } from "@/data/initialProjects";
-import type { Project, ProjectTab, Stage } from "@/types/pipeline";
+import type { Project, ProjectBriefInput, ProjectTab, Stage } from "@/types/pipeline";
 import {
   approveStage as approveStageLogic,
   assignBackToWorker as assignBackToWorkerLogic,
@@ -20,27 +22,36 @@ import {
   takeDirectorControl as takeDirectorControlLogic,
 } from "@/lib/pipelineLogic";
 
-function makeFreshStages(): Stage[] {
-  return makeStages("coffee").map((stage, index) => ({
-    ...stage,
-    status: index === 0 ? "Waiting" : "Locked",
-    versions: [],
-    notes:
-      index === 0
-        ? "Fresh project created. Concept is ready for director input."
-        : "Locked until earlier stages are approved.",
-  }));
+function makeProductionStages(): Stage[] {
+  return makeStages();
 }
 
 function normalizeProjectName(name: string) {
   return name.trim().replace(/\s+/g, " ");
 }
 
+function projectFromRow(row: any): Project {
+  return {
+    id: row.id,
+    title: row.name,
+    description: row.description ?? "New GenAI video production project",
+    status: row.status ?? "draft",
+    ownerName: row.owner_name ?? "",
+    projectType: row.project_type ?? "Advertisement",
+    aspectRatio: row.aspect_ratio ?? "9:16",
+    runtimeTarget: row.runtime_target ?? "10-20 sec",
+    visualStyle: row.visual_style ?? "Hybrid AI",
+    conceptSummary: row.concept_summary ?? "",
+    stages: makeProductionStages(),
+    assets: [],
+  };
+}
+
 export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
   const [activeProjectTab, setActiveProjectTab] =
-    useState<ProjectTab>("pipeline");
+    useState<ProjectTab>("brief");
   const [selectedStageIndex, setSelectedStageIndex] = useState(0);
   const [feedbackText, setFeedbackText] = useState("");
   const [showFinalHandoffModal, setShowFinalHandoffModal] = useState(false);
@@ -60,20 +71,12 @@ export default function Home() {
       return;
     }
 
-    const loadedProjects: Project[] = (data ?? []).map((row) => ({
-      id: row.id,
-      title: row.name,
-      description: row.description ?? "",
-      director: "Ranjit",
-      format: "9:16 Short Ad",
-      mode: "Hybrid AI Production",
-      stages: makeFreshStages(),
-      assets: [],
-    }));
+    const loadedProjects = (data ?? []).map(projectFromRow);
 
     setProjects(loadedProjects);
     setSelectedProjectIndex(0);
     setSelectedStageIndex(0);
+    setActiveProjectTab("brief");
     setIsLoadingProjects(false);
   }
 
@@ -122,21 +125,8 @@ export default function Home() {
     return cleanName;
   }
 
-  async function testDatabase() {
-    const { data, error } = await supabase.from("projects").insert([
-      {
-        name: "Test Project",
-        description: "Supabase connection working",
-        status: "active",
-      },
-    ]);
-
-    console.log("data:", data);
-    console.log("error:", error);
-  }
-
   async function createNewProject() {
-    const rawName = window.prompt("Enter project name:");
+    const rawName = window.prompt("Enter production name:");
 
     if (!rawName) return;
 
@@ -149,7 +139,7 @@ export default function Home() {
       .insert({
         name: cleanName,
         description: "New GenAI video production project",
-        status: "active",
+        status: "draft",
       })
       .select()
       .single();
@@ -159,16 +149,7 @@ export default function Home() {
       return;
     }
 
-    const newProject: Project = {
-      id: data.id,
-      title: data.name,
-      description: data.description ?? "",
-      director: "Ranjit",
-      format: "9:16 Short Ad",
-      mode: "Hybrid AI Production",
-      stages: makeFreshStages(),
-      assets: [],
-    };
+    const newProject = projectFromRow(data);
 
     setProjects((currentProjects) => {
       setSelectedProjectIndex(currentProjects.length);
@@ -176,7 +157,7 @@ export default function Home() {
     });
 
     setSelectedStageIndex(0);
-    setActiveProjectTab("pipeline");
+    setActiveProjectTab("brief");
   }
 
   async function renameCurrentProject() {
@@ -185,7 +166,7 @@ export default function Home() {
       return;
     }
 
-    const rawName = window.prompt("Project name:", project.title);
+    const rawName = window.prompt("Production name:", project.title);
 
     if (!rawName) return;
 
@@ -239,7 +220,82 @@ export default function Home() {
     setProjects(remainingProjects);
     setSelectedProjectIndex(0);
     setSelectedStageIndex(0);
+    setActiveProjectTab("brief");
+  }
+
+  async function saveBrief(brief: ProjectBriefInput, nextStatus?: Project["status"]) {
+    if (!project?.id) return;
+
+    const status = nextStatus ?? project.status;
+
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        owner_name: brief.ownerName,
+        project_type: brief.projectType,
+        aspect_ratio: brief.aspectRatio,
+        runtime_target: brief.runtimeTarget,
+        visual_style: brief.visualStyle,
+        concept_summary: brief.conceptSummary,
+        status,
+      })
+      .eq("id", project.id);
+
+    if (error) {
+      console.error("Failed to save brief:", error);
+      return;
+    }
+
+    setProjects((currentProjects) =>
+      currentProjects.map((item) =>
+        item.id === project.id
+          ? {
+              ...item,
+              ...brief,
+              status,
+              description:
+                brief.conceptSummary.trim() ||
+                "New GenAI video production project",
+            }
+          : item
+      )
+    );
+  }
+
+  async function approveBrief(brief: ProjectBriefInput) {
+    if (!brief.ownerName.trim()) {
+      window.alert("Owner / Director name is required.");
+      return;
+    }
+
+    if (brief.conceptSummary.trim().length < 20) {
+      window.alert("Concept summary must be at least 20 characters.");
+      return;
+    }
+
+    await saveBrief(brief, "in_production");
     setActiveProjectTab("pipeline");
+    setSelectedStageIndex(0);
+  }
+
+  async function markProjectComplete() {
+    if (!project?.id) return;
+
+    const { error } = await supabase
+      .from("projects")
+      .update({ status: "complete" })
+      .eq("id", project.id);
+
+    if (error) {
+      console.error("Failed to mark project complete:", error);
+      return;
+    }
+
+    setProjects((currentProjects) =>
+      currentProjects.map((item) =>
+        item.id === project.id ? { ...item, status: "complete" } : item
+      )
+    );
   }
 
   function updateCurrentProjectStages(nextStages: Stage[]) {
@@ -261,15 +317,19 @@ export default function Home() {
     updateCurrentProjectStages(
       approveStageLogic(stages, selectedStageIndex, feedbackText)
     );
+
     setFeedbackText("");
   }
 
-  function confirmFinalHandoffApproval() {
+  async function confirmFinalHandoffApproval() {
     if (!selectedStage) return;
 
     updateCurrentProjectStages(
       approveStageLogic(stages, selectedStageIndex, feedbackText)
     );
+
+    await markProjectComplete();
+
     setFeedbackText("");
     setShowFinalHandoffModal(false);
   }
@@ -280,6 +340,7 @@ export default function Home() {
     updateCurrentProjectStages(
       rejectLatestVersionLogic(stages, selectedStageIndex, feedbackText)
     );
+
     setFeedbackText("");
   }
 
@@ -289,6 +350,7 @@ export default function Home() {
     updateCurrentProjectStages(
       submitNewVersionLogic(stages, selectedStageIndex, feedbackText)
     );
+
     setFeedbackText("");
   }
 
@@ -316,44 +378,38 @@ export default function Home() {
   function switchProject(index: number) {
     setSelectedProjectIndex(index);
     setSelectedStageIndex(0);
-    setActiveProjectTab("pipeline");
+    setActiveProjectTab("brief");
     setFeedbackText("");
     setShowFinalHandoffModal(false);
   }
 
-  if (isLoadingProjects) {
-    return <main className="p-6 text-white">Loading projects...</main>;
-  }
-
-  if (!project) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-black text-white">
-        <div className="text-center">
-          <p className="text-lg font-semibold">No projects found.</p>
-          <button
-            onClick={createNewProject}
-            className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-medium text-black"
-          >
-            Create New Project
-          </button>
-        </div>
-      </main>
-    );
-  }
-
-  if (!selectedStage) {
-    return <main className="p-6 text-white">No stage selected.</main>;
-  }
-
-  const activeProject: Project = project;
-
   function renderProjectTab() {
+    if (!project) return null;
+
+    if (activeProjectTab === "brief") {
+      return (
+        <BriefView
+          project={project}
+          onSaveBrief={(brief) => saveBrief(brief)}
+          onApproveBrief={approveBrief}
+        />
+      );
+    }
+
+    if (project.status === "draft") {
+      return (
+        <div className="rounded-2xl border border-yellow-900 bg-yellow-950/30 p-6 text-yellow-200">
+          Production pipeline is locked until the concept brief is approved.
+        </div>
+      );
+    }
+
     if (activeProjectTab === "pipeline") {
       return (
         <PipelineView
-          project={activeProject}
+          project={project}
           stages={stages}
-          assets={activeProject.assets}
+          assets={project.assets}
           selectedStageIndex={selectedStageIndex}
           feedbackText={feedbackText}
           onSelectStage={setSelectedStageIndex}
@@ -368,18 +424,55 @@ export default function Home() {
     }
 
     if (activeProjectTab === "assets") {
-      return <AssetsView project={activeProject} />;
+      return <AssetsView project={project} />;
     }
 
     if (activeProjectTab === "approvals") {
-      return <ApprovalsView project={activeProject} onOpenStage={openStage} />;
+      return <ApprovalsView project={project} onOpenStage={openStage} />;
     }
 
     if (activeProjectTab === "handoff") {
-      return <HandoffView project={activeProject} />;
+      return <HandoffView project={project} />;
     }
 
     return null;
+  }
+
+  if (isLoadingProjects) {
+    return <main className="p-6 text-white">Loading productions...</main>;
+  }
+
+  if (!project) {
+    return (
+      <main className="min-h-screen bg-black text-white">
+        <div className="flex min-h-screen items-center justify-center p-8">
+          <div className="max-w-2xl text-center">
+            <p className="mb-3 text-sm uppercase tracking-[0.35em] text-zinc-500">
+              GenAI Production System
+            </p>
+
+            <h1 className="mb-4 text-5xl font-bold">
+              No active productions initialized.
+            </h1>
+
+            <p className="mx-auto mb-8 max-w-xl text-zinc-400">
+              Start a new production brief to initialize the project database,
+              define creative direction, unlock the workflow pipeline, and
+              preserve the final handoff as searchable production memory.
+            </p>
+
+            <button
+              onClick={createNewProject}
+              className="rounded-xl bg-white px-5 py-3 text-sm font-medium text-black hover:bg-zinc-200"
+            >
+              Initialize Production
+            </button>
+          </div>
+        </div>
+
+        <DataViewButton projects={projects} />
+      </main>
+    );
   }
 
   return (
@@ -396,36 +489,31 @@ export default function Home() {
       <section className="flex-1 p-6">
         <div className="mb-4 flex gap-3">
           <button
-            onClick={testDatabase}
-            className="rounded-xl bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
-          >
-            Test Database
-          </button>
-
-          <button
             onClick={createNewProject}
             className="rounded-xl bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
           >
-            New Project
+            New Production
           </button>
 
           <button
             onClick={renameCurrentProject}
             className="rounded-xl bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
           >
-            Rename Project
+            Rename
           </button>
 
           <button
             onClick={deleteCurrentProject}
             className="rounded-xl bg-red-900 px-4 py-2 text-sm hover:bg-red-800"
           >
-            Delete Project
+            Delete
           </button>
         </div>
 
         {renderProjectTab()}
       </section>
+
+      <DataViewButton projects={projects} />
 
       {showFinalHandoffModal && (
         <FinalHandoffConfirmModal

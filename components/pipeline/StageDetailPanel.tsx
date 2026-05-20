@@ -1,8 +1,9 @@
-import type { Asset, Stage } from "@/types/pipeline";
+import type { Asset, ProjectStatus, Stage } from "@/types/pipeline";
 import { statusStyle } from "@/lib/statusStyle";
 import { blockedReason, isStageBlocked } from "@/lib/pipelineLogic";
 
 export function StageDetailPanel({
+  projectStatus,
   stages,
   selectedStageIndex,
   assets,
@@ -14,6 +15,7 @@ export function StageDetailPanel({
   onApproveStage,
   onRejectLatestVersion,
 }: {
+  projectStatus: ProjectStatus;
   stages: Stage[];
   selectedStageIndex: number;
   assets: Asset[];
@@ -28,8 +30,13 @@ export function StageDetailPanel({
   const selectedStage = stages[selectedStageIndex];
   const selectedStageBlocked = isStageBlocked(stages, selectedStageIndex);
   const selectedStageApproved = selectedStage.status === "Approved";
-  const stageReadOnly = selectedStageBlocked || selectedStageApproved;
-  const ownershipLocked = selectedStageBlocked || selectedStageApproved;
+  const projectComplete = projectStatus === "complete";
+
+  const stageReadOnly =
+    selectedStageBlocked || selectedStageApproved || projectComplete;
+
+  const ownershipLocked =
+    selectedStageBlocked || selectedStageApproved || projectComplete;
 
   const linkedAssets = assets.filter(
     (asset) => asset.linkedStage === selectedStage.title
@@ -66,13 +73,19 @@ export function StageDetailPanel({
           </span>
         </div>
 
-        {selectedStageBlocked && (
+        {projectComplete && (
+          <div className="mb-5 rounded-xl border border-zinc-700 bg-zinc-900 p-4 text-sm text-zinc-300">
+            This production is complete. The pipeline is archived and read-only.
+          </div>
+        )}
+
+        {!projectComplete && selectedStageBlocked && (
           <div className="mb-5 rounded-xl border border-yellow-800 bg-yellow-950 p-4 text-sm text-yellow-200">
             {blockedReason(stages, selectedStageIndex)}
           </div>
         )}
 
-        {selectedStageApproved && (
+        {!projectComplete && selectedStageApproved && (
           <div className="mb-5 rounded-xl border border-green-800 bg-green-950 p-4 text-sm text-green-200">
             This stage is approved and locked from further changes.
           </div>
@@ -123,7 +136,9 @@ export function StageDetailPanel({
           onChange={(event) => onFeedbackChange(event.target.value)}
           disabled={stageReadOnly}
           placeholder={
-            stageReadOnly
+            projectComplete
+              ? "This production is archived and read-only."
+              : stageReadOnly
               ? "This stage is locked from edits."
               : "Write feedback, revision note, approval note, or submission note..."
           }
@@ -264,8 +279,8 @@ export function StageDetailPanel({
 
         {ownershipLocked && (
           <p className="mt-3 text-xs text-zinc-500">
-            Ownership controls are disabled while this stage is locked or already
-            approved.
+            Ownership controls are disabled while this stage is locked, already
+            approved, or the production is archived.
           </p>
         )}
       </div>
