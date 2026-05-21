@@ -8,6 +8,7 @@ import type {
   ProjectType,
   RuntimeTarget,
   VisualStyle,
+  WorkflowMode,
 } from "@/types/pipeline";
 
 const PROJECT_TYPES: ProjectType[] = [
@@ -32,6 +33,13 @@ const RUNTIME_TARGETS: RuntimeTarget[] = [
   "1-3 min",
   "3-10 min",
   ">10 min",
+];
+
+const WORKFLOW_MODES: WorkflowMode[] = [
+  "Solo Production",
+  "Team Production",
+  "Hybrid",
+  "API Assisted",
 ];
 
 const VISUAL_STYLES: VisualStyle[] = [
@@ -63,18 +71,24 @@ export function BriefView({
   const [runtimeTarget, setRuntimeTarget] = useState<RuntimeTarget>(
     project.runtimeTarget
   );
+  const [workflowMode, setWorkflowMode] = useState<WorkflowMode>(
+    project.workflowMode
+  );
   const [visualStyle, setVisualStyle] = useState<VisualStyle>(
     project.visualStyle
   );
   const [conceptSummary, setConceptSummary] = useState(project.conceptSummary);
+  const [additionalInfo, setAdditionalInfo] = useState(project.additionalInfo);
 
   useEffect(() => {
     setOwnerName(project.ownerName);
     setProjectType(project.projectType);
     setAspectRatio(project.aspectRatio);
     setRuntimeTarget(project.runtimeTarget);
+    setWorkflowMode(project.workflowMode);
     setVisualStyle(project.visualStyle);
     setConceptSummary(project.conceptSummary);
+    setAdditionalInfo(project.additionalInfo);
   }, [project]);
 
   const brief: ProjectBriefInput = {
@@ -82,8 +96,10 @@ export function BriefView({
     projectType,
     aspectRatio,
     runtimeTarget,
+    workflowMode,
     visualStyle,
     conceptSummary,
+    additionalInfo,
   };
 
   const conceptApproved = project.status !== "draft";
@@ -111,6 +127,7 @@ export function BriefView({
         <div className="mb-6 flex items-start justify-between gap-6">
           <div>
             <h3 className="text-2xl font-bold">Concept / Brief</h3>
+
             <p className="mt-2 max-w-2xl text-sm text-zinc-500">
               This is the production intake layer. Once approved, the project
               moves into production and pipeline stages become active.
@@ -184,6 +201,21 @@ export function BriefView({
             </select>
           </Field>
 
+          <Field label="Workflow Mode">
+            <select
+              value={workflowMode}
+              onChange={(event) =>
+                setWorkflowMode(event.target.value as WorkflowMode)
+              }
+              disabled={conceptApproved}
+              className="Input"
+            >
+              {WORKFLOW_MODES.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </Field>
+
           <Field label="Visual Style">
             <select
               value={visualStyle}
@@ -207,6 +239,18 @@ export function BriefView({
                 disabled={conceptApproved}
                 placeholder="Write the core creative idea, product/message, target feeling, and production direction."
                 className="min-h-32 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white outline-none focus:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </Field>
+          </div>
+
+          <div className="col-span-2">
+            <Field label="Additional Production Notes">
+              <textarea
+                value={additionalInfo}
+                onChange={(event) => setAdditionalInfo(event.target.value)}
+                disabled={conceptApproved}
+                placeholder="Optional notes about references, constraints, required assets, client expectations, or production risks."
+                className="min-h-24 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white outline-none focus:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </Field>
           </div>
@@ -244,6 +288,7 @@ function Field({
   return (
     <label className="block">
       <p className="mb-2 text-sm text-zinc-500">{label}</p>
+
       {children}
     </label>
   );
@@ -253,6 +298,7 @@ function StatusCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
       <p className="text-sm text-zinc-500">{label}</p>
+
       <p className="mt-2 text-2xl font-bold capitalize">{value}</p>
     </div>
   );

@@ -8,22 +8,28 @@ export function StageDetailPanel({
   selectedStageIndex,
   assets,
   feedbackText,
+  isUploadingAsset,
   onFeedbackChange,
+  onTakeDirectorControl,
+  onAssignBackToWorker,
   onSubmitNewVersion,
   onApproveStage,
   onRejectLatestVersion,
+  onUploadAsset,
 }: {
   projectStatus?: "draft" | "in_production" | "complete";
   stages: Stage[];
   selectedStageIndex: number;
   assets: Asset[];
   feedbackText: string;
+  isUploadingAsset?: boolean;
   onFeedbackChange: (value: string) => void;
   onTakeDirectorControl?: () => void;
   onAssignBackToWorker?: () => void;
   onSubmitNewVersion: () => void;
   onApproveStage: () => void;
   onRejectLatestVersion: () => void;
+  onUploadAsset?: (file: File) => void;
 }) {
   const selectedStage = stages[selectedStageIndex];
 
@@ -45,6 +51,15 @@ export function StageDetailPanel({
   const linkedAssets = assets.filter(
     (asset) => asset.linkedStage === selectedStage.title
   );
+
+  function handleAssetUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file || !onUploadAsset) return;
+
+    onUploadAsset(file);
+    event.target.value = "";
+  }
 
   return (
     <aside className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
@@ -82,15 +97,90 @@ export function StageDetailPanel({
         )}
       </div>
 
+      <div className="mb-6 rounded-2xl border border-zinc-800 bg-black/30 p-4">
+        <p className="mb-3 text-sm text-zinc-500">Responsibility</p>
+
+        <div className="space-y-3 text-sm">
+          <InfoRow label="Owner" value={selectedStage.owner} />
+          <InfoRow
+            label="Assigned Worker"
+            value={selectedStage.assignedWorker}
+          />
+          <InfoRow
+            label="Default Worker"
+            value={selectedStage.defaultWorker}
+          />
+          <InfoRow
+            label="Approval Authority"
+            value={selectedStage.approvalAuthority}
+          />
+          <InfoRow label="Access Level" value={selectedStage.accessLevel} />
+        </div>
+
+        {(onTakeDirectorControl || onAssignBackToWorker) && (
+          <div className="mt-4 grid grid-cols-1 gap-3">
+            <button
+              onClick={onTakeDirectorControl}
+              disabled={projectComplete || selectedStageApproved}
+              className="rounded-xl border border-blue-800 bg-blue-950 p-3 text-sm text-blue-200 hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Director / Owner Takeover
+            </button>
+
+            <button
+              onClick={onAssignBackToWorker}
+              disabled={projectComplete || selectedStageApproved}
+              className="rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Assign Back to Worker
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="mb-6">
         <p className="mb-2 text-sm text-zinc-500">Task Brief</p>
+
         <p className="leading-relaxed text-zinc-300">
           {selectedStage.taskBrief}
         </p>
       </div>
 
+      {selectedStage.notes && (
+        <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+          <p className="mb-2 text-sm text-zinc-500">Latest Decision Note</p>
+
+          <p className="text-sm leading-relaxed text-zinc-300">
+            {selectedStage.notes}
+          </p>
+        </div>
+      )}
+
       <div className="mb-6 rounded-2xl border border-zinc-800 bg-black/30 p-4">
-        <p className="mb-3 text-sm text-zinc-500">Actions</p>
+        <p className="mb-2 text-sm text-zinc-500">Production Note</p>
+
+        <textarea
+          value={feedbackText}
+          onChange={(event) => onFeedbackChange(event.target.value)}
+          disabled={stageReadOnly}
+          placeholder={
+            projectComplete
+              ? "This production is archived."
+              : stageReadOnly
+              ? "This stage is locked."
+              : "Add production notes, revision context, or approval comments..."
+          }
+          className="min-h-24 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white outline-none focus:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+
+        <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+          Optional for approval. Recommended for version submissions and
+          required for revision requests.
+        </p>
+      </div>
+
+      <div className="mb-6 rounded-2xl border border-zinc-800 bg-black/30 p-4">
+        <p className="mb-3 text-sm text-zinc-500">Stage Actions</p>
 
         <div className="grid grid-cols-1 gap-3">
           <button
@@ -114,52 +204,64 @@ export function StageDetailPanel({
             disabled={stageReadOnly}
             className="rounded-xl border border-red-800 bg-red-950 p-3 text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Reject
+            Request Revision
           </button>
         </div>
-      </div>
-
-      <div className="mb-6">
-        <p className="mb-2 text-sm text-zinc-500">Feedback Note</p>
-
-        <textarea
-          value={feedbackText}
-          onChange={(event) => onFeedbackChange(event.target.value)}
-          disabled={stageReadOnly}
-          placeholder={
-            projectComplete
-              ? "This production is archived."
-              : stageReadOnly
-              ? "This stage is locked."
-              : "Write approval, rejection, or revision note..."
-          }
-          className="min-h-24 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white outline-none focus:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
-        />
       </div>
 
       <div className="mb-6 border-t border-zinc-800 pt-5">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm text-zinc-500">Assets</p>
+
           <span className="text-xs text-zinc-600">
             {linkedAssets.length} linked
           </span>
         </div>
 
-        <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-500">
-          Asset upload will connect after stage persistence and Supabase Storage.
+        <div className="mb-3 rounded-xl border border-dashed border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-500">
+          Upload references, generated visuals, clips, audio, or edit exports
+          for this selected stage.
         </div>
 
+        {onUploadAsset && (
+          <label
+            className={`mb-4 flex cursor-pointer items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-200 hover:bg-zinc-800 ${
+              stageReadOnly || isUploadingAsset
+                ? "pointer-events-none cursor-not-allowed opacity-40"
+                : ""
+            }`}
+          >
+            {isUploadingAsset ? "Uploading Asset..." : "Upload Asset"}
+
+            <input
+              type="file"
+              className="hidden"
+              disabled={stageReadOnly || isUploadingAsset}
+              onChange={handleAssetUpload}
+            />
+          </label>
+        )}
+
         {linkedAssets.length > 0 && (
-          <div className="mt-3 space-y-3">
+          <div className="space-y-3">
             {linkedAssets.map((asset) => (
               <div
-                key={asset.name}
+                key={asset.id ?? asset.name}
                 className="rounded-xl border border-zinc-800 bg-zinc-900 p-3"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-medium">{asset.name}</p>
-                    <p className="mt-1 text-xs text-zinc-500">{asset.type}</p>
+
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {asset.type}
+                    </p>
+
+                    {asset.createdAt && (
+                      <p className="mt-1 text-xs text-zinc-600">
+                        {new Date(asset.createdAt).toLocaleString()}
+                      </p>
+                    )}
                   </div>
 
                   <span
@@ -170,6 +272,17 @@ export function StageDetailPanel({
                     {asset.status}
                   </span>
                 </div>
+
+                {asset.publicUrl && (
+                  <a
+                    href={asset.publicUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex text-xs text-zinc-400 underline hover:text-zinc-200"
+                  >
+                    Open Asset
+                  </a>
+                )}
               </div>
             ))}
           </div>
@@ -215,6 +328,24 @@ export function StageDetailPanel({
         </div>
       </details>
     </aside>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-zinc-500">{label}</span>
+
+      <span className="max-w-[55%] text-right font-medium text-zinc-200">
+        {value || "—"}
+      </span>
+    </div>
   );
 }
 

@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Project, ProjectBriefInput, ProjectTab, Stage } from "@/types/pipeline";
+import type {
+  Project,
+  ProjectBriefInput,
+  ProjectTab,
+  Stage,
+} from "@/types/pipeline";
 import {
   approveStage as approveStageLogic,
   assignBackToWorker as assignBackToWorkerLogic,
@@ -16,6 +21,10 @@ import {
   makeProductionStages,
   saveStagesForProject,
 } from "@/lib/stagePersistence";
+import {
+  loadAssetsForProject,
+  uploadAssetForStage,
+} from "@/lib/assetPersistence";
 
 function normalizeProjectName(name: string) {
   return name.trim().replace(/\s+/g, " ");
@@ -31,11 +40,23 @@ function projectFromRow(row: any): Project {
     projectType: row.project_type ?? "Advertisement",
     aspectRatio: row.aspect_ratio ?? "9:16",
     runtimeTarget: row.runtime_target ?? "10-20 sec",
+    workflowMode: row.workflow_mode ?? "Solo Production",
     visualStyle: row.visual_style ?? "Hybrid AI",
     conceptSummary: row.concept_summary ?? "",
+    additionalInfo: row.additional_info ?? "",
     stages: [],
     assets: [],
   };
+}
+
+function withStageNote(
+  stages: Stage[],
+  selectedStageIndex: number,
+  note: string
+) {
+  return stages.map((stage, index) =>
+    index === selectedStageIndex ? { ...stage, notes: note } : stage
+  );
 }
 
 export function useProductionProjects() {
@@ -46,6 +67,7 @@ export function useProductionProjects() {
   const [feedbackText, setFeedbackText] = useState("");
   const [showFinalHandoffModal, setShowFinalHandoffModal] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [isUploadingAsset, setIsUploadingAsset] = useState(false);
 
   const project =
     selectedProjectIndex >= 0 && selectedProjectIndex < projects.length
@@ -80,11 +102,18 @@ export function useProductionProjects() {
     const loadedProjects = await Promise.all(
       (data ?? []).map(async (row) => {
         const baseProject = projectFromRow(row);
-        const loadedStages = await loadStagesForProject(row.id, baseProject.status);
+
+        const loadedStages = await loadStagesForProject(
+          row.id,
+          baseProject.status
+        );
+
+        const loadedAssets = await loadAssetsForProject(row.id);
 
         return {
           ...baseProject,
           stages: loadedStages,
+          assets: loadedAssets,
         };
       })
     );
@@ -111,7 +140,8 @@ export function useProductionProjects() {
     const duplicate = projects.some(
       (item) =>
         item.id !== currentProjectId &&
-        normalizeProjectName(item.title).toLowerCase() === cleanName.toLowerCase()
+        normalizeProjectName(item.title).toLowerCase() ===
+          cleanName.toLowerCase()
     );
 
     if (duplicate) {
@@ -186,10 +216,16 @@ export function useProductionProjects() {
   async function deleteCurrentProject() {
     if (!project?.id) return;
 
-    const confirmed = window.confirm(`Delete "${project.title}"? This cannot be undone.`);
+    const confirmed = window.confirm(
+      `Delete "${project.title}"? This cannot be undone.`
+    );
+
     if (!confirmed) return;
 
-    const { error } = await supabase.from("projects").delete().eq("id", project.id);
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", project.id);
 
     if (error) {
       console.error("Failed to delete project:", error);
@@ -202,7 +238,10 @@ export function useProductionProjects() {
     setActiveProjectTab("brief");
   }
 
-  async function saveBrief(brief: ProjectBriefInput, nextStatus?: Project["status"]) {
+  async function saveBrief(
+    brief: ProjectBriefInput,
+    nextStatus?: Project["status"]
+  ) {
     if (!project?.id) return false;
 
     const status = nextStatus ?? project.status;
@@ -216,8 +255,10 @@ export function useProductionProjects() {
         project_type: brief.projectType,
         aspect_ratio: brief.aspectRatio,
         runtime_target: brief.runtimeTarget,
+        workflow_mode: brief.workflowMode,
         visual_style: brief.visualStyle,
         concept_summary: brief.conceptSummary,
+        additional_info: brief.additionalInfo,
         description,
         status,
       })
@@ -230,7 +271,9 @@ export function useProductionProjects() {
 
     setProjects((currentProjects) =>
       currentProjects.map((item) =>
-        item.id === project.id ? { ...item, ...brief, description, status } : item
+        item.id === project.id
+          ? { ...item, ...brief, description, status }
+          : item
       )
     );
 
@@ -257,6 +300,11 @@ export function useProductionProjects() {
     const stagesSaved = await saveStagesForProject(project.id, defaultStages);
     if (!stagesSaved) return;
 
+    const loadedStages = await loadStagesForProject(
+      project.id,
+      "in_production"
+    );
+
     setProjects((currentProjects) =>
       currentProjects.map((item) =>
         item.id === project.id
@@ -264,7 +312,7 @@ export function useProductionProjects() {
               ...item,
               ...brief,
               status: "in_production",
-              stages: defaultStages,
+              stages: loadedStages,
               description:
                 brief.conceptSummary.trim() ||
                 "New GenAI video production project",
@@ -303,11 +351,52 @@ export function useProductionProjects() {
     const saved = await saveStagesForProject(project.id, nextStages);
     if (!saved) return;
 
+    const reloadedStages = await loadStagesForProject(project.id, project.status);
+
     setProjects((currentProjects) =>
       currentProjects.map((item, index) =>
-        index === selectedProjectIndex ? { ...item, stages: nextStages } : item
+        index === selectedProjectIndex
+          ? { ...item, stages: reloadedStages }
+          : item
       )
     );
+  }
+
+  async function reloadCurrentProjectAssets() {
+    if (!project?.id) return;
+
+    const loadedAssets = await loadAssetsForProject(project.id);
+
+    setProjects((currentProjects) =>
+      currentProjects.map((item, index) =>
+        index === selectedProjectIndex
+          ? { ...item, assets: loadedAssets }
+          : item
+      )
+    );
+  }
+
+  async function uploadAsset(file: File) {
+    if (!project?.id || !selectedStage) return;
+
+    setIsUploadingAsset(true);
+
+    const uploadedAsset = await uploadAssetForStage({
+      projectId: project.id,
+      stageId: selectedStage.id,
+      stageTitle: selectedStage.title,
+      file,
+      uploadedBy: selectedStage.assignedWorker || project.ownerName,
+    });
+
+    if (!uploadedAsset) {
+      setIsUploadingAsset(false);
+      return;
+    }
+
+    await reloadCurrentProjectAssets();
+
+    setIsUploadingAsset(false);
   }
 
   async function approveStage() {
@@ -318,8 +407,16 @@ export function useProductionProjects() {
       return;
     }
 
+    const approvalNote = feedbackText.trim() || "Approved";
+
+    const approvedStages = approveStageLogic(
+      stages,
+      selectedStageIndex,
+      approvalNote
+    );
+
     await updateCurrentProjectStages(
-      approveStageLogic(stages, selectedStageIndex, feedbackText)
+      withStageNote(approvedStages, selectedStageIndex, approvalNote)
     );
 
     setFeedbackText("");
@@ -328,8 +425,16 @@ export function useProductionProjects() {
   async function confirmFinalHandoffApproval() {
     if (!selectedStage) return;
 
+    const approvalNote = feedbackText.trim() || "Final handoff approved";
+
+    const approvedStages = approveStageLogic(
+      stages,
+      selectedStageIndex,
+      approvalNote
+    );
+
     await updateCurrentProjectStages(
-      approveStageLogic(stages, selectedStageIndex, feedbackText)
+      withStageNote(approvedStages, selectedStageIndex, approvalNote)
     );
 
     await markProjectComplete();
@@ -341,8 +446,21 @@ export function useProductionProjects() {
   async function rejectLatestVersion() {
     if (!selectedStage || selectedStageBlocked) return;
 
+    const revisionNote = feedbackText.trim();
+
+    if (revisionNote.length < 2) {
+      window.alert("Please add a short revision note before requesting changes.");
+      return;
+    }
+
+    const rejectedStages = rejectLatestVersionLogic(
+      stages,
+      selectedStageIndex,
+      revisionNote
+    );
+
     await updateCurrentProjectStages(
-      rejectLatestVersionLogic(stages, selectedStageIndex, feedbackText)
+      withStageNote(rejectedStages, selectedStageIndex, revisionNote)
     );
 
     setFeedbackText("");
@@ -351,8 +469,16 @@ export function useProductionProjects() {
   async function submitNewVersion() {
     if (!selectedStage || selectedStageBlocked) return;
 
+    const versionNote = feedbackText.trim() || "Version submitted";
+
+    const submittedStages = submitNewVersionLogic(
+      stages,
+      selectedStageIndex,
+      versionNote
+    );
+
     await updateCurrentProjectStages(
-      submitNewVersionLogic(stages, selectedStageIndex, feedbackText)
+      withStageNote(submittedStages, selectedStageIndex, versionNote)
     );
 
     setFeedbackText("");
@@ -397,6 +523,7 @@ export function useProductionProjects() {
     feedbackText,
     showFinalHandoffModal,
     isLoadingProjects,
+    isUploadingAsset,
     setActiveProjectTab,
     setSelectedStageIndex,
     setFeedbackText,
@@ -412,6 +539,7 @@ export function useProductionProjects() {
     takeDirectorControl,
     assignBackToWorker,
     confirmFinalHandoffApproval,
+    uploadAsset,
     openStage,
     switchProject,
   };

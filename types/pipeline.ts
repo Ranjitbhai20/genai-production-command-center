@@ -6,7 +6,12 @@ export type StageStatus =
   | "Waiting"
   | "Locked";
 
-export type ProjectTab = "brief" | "pipeline" | "assets" | "approvals" | "handoff";
+export type ProjectTab =
+  | "brief"
+  | "pipeline"
+  | "assets"
+  | "approvals"
+  | "handoff";
 
 export type ProjectStatus = "draft" | "in_production" | "complete";
 
@@ -55,28 +60,57 @@ export type Version = {
 };
 
 export type Stage = {
+  id?: string;
+
   title: string;
   owner: string;
   defaultWorker: string;
   approvalAuthority: string;
+
   status: StageStatus;
+
   tool: string;
   method: string;
   executionMode: string;
+
   assignedWorker: string;
   accessLevel: string;
+
   taskBrief: string;
   description: string;
+
   notes: string;
+
   versions: Version[];
+
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Asset = {
+  id?: string;
+
+  projectId?: string;
+
+  stageId?: string;
+  linkedStage: string;
+
   name: string;
   type: string;
-  linkedStage: string;
+
   status: StageStatus;
+
   source: string;
+
+  uploadedBy?: string;
+
+  storagePath?: string;
+  publicUrl?: string;
+
+  sizeBytes?: number;
+
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type ProjectBriefInput = {
@@ -92,17 +126,21 @@ export type ProjectBriefInput = {
 
 export type Project = {
   id?: string;
+
   title: string;
   description: string;
   status: ProjectStatus;
+
   ownerName: string;
   projectType: ProjectType;
   aspectRatio: AspectRatio;
   runtimeTarget: RuntimeTarget;
   workflowMode: WorkflowMode;
   visualStyle: VisualStyle;
+
   conceptSummary: string;
   additionalInfo: string;
+
   stages: Stage[];
   assets: Asset[];
 };

@@ -9,6 +9,7 @@ export function PipelineView({
   assets,
   selectedStageIndex,
   feedbackText,
+  isUploadingAsset,
   onSelectStage,
   onFeedbackChange,
   onTakeDirectorControl,
@@ -16,12 +17,14 @@ export function PipelineView({
   onSubmitNewVersion,
   onApproveStage,
   onRejectLatestVersion,
+  onUploadAsset,
 }: {
   project: Project;
   stages: Stage[];
   assets: Asset[];
   selectedStageIndex: number;
   feedbackText: string;
+  isUploadingAsset?: boolean;
   onSelectStage: (index: number) => void;
   onFeedbackChange: (value: string) => void;
   onTakeDirectorControl: () => void;
@@ -29,6 +32,7 @@ export function PipelineView({
   onSubmitNewVersion: () => void;
   onApproveStage: () => void;
   onRejectLatestVersion: () => void;
+  onUploadAsset?: (file: File) => void;
 }) {
   const approvedCount = stages.filter(
     (stage) => stage.status === "Approved"
@@ -53,6 +57,7 @@ export function PipelineView({
           <p className="text-sm font-semibold text-white">
             Production Archived
           </p>
+
           <p className="mt-2 text-sm text-zinc-400">
             Final handoff is complete. This production is now preserved as a
             read-only database record.
@@ -69,10 +74,11 @@ export function PipelineView({
 
       <div className="mb-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
         <p className="mb-2 text-sm text-zinc-500">Production Logic</p>
+
         <p className="text-zinc-300">
           Brief approval unlocks the pipeline. Script approval unlocks the
-          production floor. Stage submissions, approvals, rejections, and final
-          handoff are preserved as production memory.
+          production floor. Stage submissions, approvals, rejections, assets,
+          and final handoff are preserved as production memory.
         </p>
       </div>
 
@@ -89,12 +95,14 @@ export function PipelineView({
           selectedStageIndex={selectedStageIndex}
           assets={assets}
           feedbackText={feedbackText}
+          isUploadingAsset={isUploadingAsset}
           onFeedbackChange={onFeedbackChange}
           onTakeDirectorControl={onTakeDirectorControl}
           onAssignBackToWorker={onAssignBackToWorker}
           onSubmitNewVersion={onSubmitNewVersion}
           onApproveStage={onApproveStage}
           onRejectLatestVersion={onRejectLatestVersion}
+          onUploadAsset={onUploadAsset}
         />
       </div>
     </div>
@@ -105,6 +113,7 @@ function MetricCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
       <p className="text-sm text-zinc-500">{label}</p>
+
       <p className="text-3xl font-bold">{value}</p>
     </div>
   );
