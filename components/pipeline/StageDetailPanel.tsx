@@ -22,7 +22,6 @@ export function StageDetailPanel({
   onResubmitAsset,
   onWithdrawAsset,
   onDeleteDraftAsset,
-  onRemoveUnsafeAsset,
 }: {
   projectStatus?: "draft" | "in_production" | "complete";
   stages: Stage[];
@@ -43,7 +42,6 @@ export function StageDetailPanel({
   onResubmitAsset?: (assetId: string) => void;
   onWithdrawAsset?: (assetId: string) => void;
   onDeleteDraftAsset?: (asset: Asset) => void;
-  onRemoveUnsafeAsset?: (asset: Asset) => void;
 }) {
   const selectedStage = stages[selectedStageIndex];
 
@@ -67,15 +65,18 @@ export function StageDetailPanel({
   );
 
   const draftAssets = linkedAssets.filter((asset) => asset.status === "Draft");
+
   const submittedAssets = linkedAssets.filter(
     (asset) => asset.status === "Submitted"
   );
+
   const reviewedAssets = linkedAssets.filter(
     (asset) =>
       asset.status !== "Draft" &&
       asset.status !== "Submitted" &&
       asset.status !== "Removed"
   );
+
   const removedAssets = linkedAssets.filter(
     (asset) => asset.status === "Removed"
   );
@@ -276,7 +277,6 @@ export function StageDetailPanel({
           assets={draftAssets}
           isUpdatingAsset={isUpdatingAsset}
           onDeleteDraftAsset={onDeleteDraftAsset}
-          onRemoveUnsafeAsset={onRemoveUnsafeAsset}
         />
 
         <AssetSection
@@ -287,7 +287,6 @@ export function StageDetailPanel({
           onApproveAsset={onApproveAsset}
           onRejectAsset={onRejectAsset}
           onWithdrawAsset={onWithdrawAsset}
-          onRemoveUnsafeAsset={onRemoveUnsafeAsset}
         />
 
         <AssetSection
@@ -296,7 +295,6 @@ export function StageDetailPanel({
           assets={reviewedAssets}
           isUpdatingAsset={isUpdatingAsset}
           onResubmitAsset={onResubmitAsset}
-          onRemoveUnsafeAsset={onRemoveUnsafeAsset}
         />
 
         {removedAssets.length > 0 && (
@@ -361,7 +359,6 @@ function AssetSection({
   onResubmitAsset,
   onWithdrawAsset,
   onDeleteDraftAsset,
-  onRemoveUnsafeAsset,
 }: {
   title: string;
   emptyText: string;
@@ -372,12 +369,12 @@ function AssetSection({
   onResubmitAsset?: (assetId: string) => void;
   onWithdrawAsset?: (assetId: string) => void;
   onDeleteDraftAsset?: (asset: Asset) => void;
-  onRemoveUnsafeAsset?: (asset: Asset) => void;
 }) {
   return (
     <div className="mb-5">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-sm font-medium text-zinc-300">{title}</p>
+
         <span className="text-xs text-zinc-600">{assets.length}</span>
       </div>
 
@@ -399,7 +396,6 @@ function AssetSection({
               onResubmitAsset={onResubmitAsset}
               onWithdrawAsset={onWithdrawAsset}
               onDeleteDraftAsset={onDeleteDraftAsset}
-              onRemoveUnsafeAsset={onRemoveUnsafeAsset}
             />
           ))}
         </div>
@@ -416,7 +412,6 @@ function AssetCard({
   onResubmitAsset,
   onWithdrawAsset,
   onDeleteDraftAsset,
-  onRemoveUnsafeAsset,
 }: {
   asset: Asset;
   isUpdatingAsset?: boolean;
@@ -425,7 +420,6 @@ function AssetCard({
   onResubmitAsset?: (assetId: string) => void;
   onWithdrawAsset?: (assetId: string) => void;
   onDeleteDraftAsset?: (asset: Asset) => void;
-  onRemoveUnsafeAsset?: (asset: Asset) => void;
 }) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
@@ -511,16 +505,6 @@ function AssetCard({
               className="rounded-lg border border-yellow-800 bg-yellow-950 px-3 py-2 text-xs text-yellow-200 hover:bg-yellow-900 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Withdraw Submission
-            </button>
-          )}
-
-          {asset.status !== "Removed" && onRemoveUnsafeAsset && (
-            <button
-              onClick={() => onRemoveUnsafeAsset(asset)}
-              disabled={isUpdatingAsset}
-              className="rounded-lg border border-red-950 bg-black px-3 py-2 text-xs text-red-300 hover:bg-red-950 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Remove Unsafe File
             </button>
           )}
         </div>

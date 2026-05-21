@@ -45,7 +45,6 @@ export default function Home() {
     resubmitSelectedAsset,
     withdrawSelectedAsset,
     deleteSelectedDraftAsset,
-    removeSelectedUnsafeAsset,
     openStage,
     switchProject,
   } = useProductionProjects();
@@ -96,7 +95,6 @@ export default function Home() {
           onResubmitAsset={resubmitSelectedAsset}
           onWithdrawAsset={withdrawSelectedAsset}
           onDeleteDraftAsset={deleteSelectedDraftAsset}
-          onRemoveUnsafeAsset={removeSelectedUnsafeAsset}
         />
       );
     }
