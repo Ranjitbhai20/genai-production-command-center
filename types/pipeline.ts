@@ -1,10 +1,13 @@
 export type StageStatus =
+  | "Draft"
   | "Approved"
   | "Submitted"
   | "Rejected"
   | "Needs Revalidation"
   | "Waiting"
-  | "Locked";
+  | "Locked"
+  | "Withdrawn"
+  | "Removed";
 
 export type ProjectTab =
   | "brief"

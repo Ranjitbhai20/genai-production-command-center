@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type {
+  Asset,
   Project,
   ProjectBriefInput,
   ProjectTab,
@@ -23,10 +24,14 @@ import {
 } from "@/lib/stagePersistence";
 import {
   approveAsset,
+  deleteDraftAsset,
   loadAssetsForProject,
   rejectAsset,
+  removeUnsafeAsset,
   resubmitAsset,
+  submitDraftAssetsForStage,
   uploadAssetForStage,
+  withdrawAsset,
 } from "@/lib/assetPersistence";
 
 function normalizeProjectName(name: string) {
@@ -355,7 +360,10 @@ export function useProductionProjects() {
     const saved = await saveStagesForProject(project.id, nextStages);
     if (!saved) return;
 
-    const reloadedStages = await loadStagesForProject(project.id, project.status);
+    const reloadedStages = await loadStagesForProject(
+      project.id,
+      project.status
+    );
 
     setProjects((currentProjects) =>
       currentProjects.map((item, index) =>
@@ -393,12 +401,9 @@ export function useProductionProjects() {
       uploadedBy: selectedStage.assignedWorker || project.ownerName,
     });
 
-    if (!uploadedAsset) {
-      setIsUploadingAsset(false);
-      return;
+    if (uploadedAsset) {
+      await reloadCurrentProjectAssets();
     }
-
-    await reloadCurrentProjectAssets();
 
     setIsUploadingAsset(false);
   }
@@ -437,6 +442,64 @@ export function useProductionProjects() {
     }
 
     setIsUpdatingAsset(false);
+  }
+
+  async function withdrawSelectedAsset(assetId: string) {
+    setIsUpdatingAsset(true);
+
+    const updatedAsset = await withdrawAsset(assetId);
+
+    if (updatedAsset) {
+      await reloadCurrentProjectAssets();
+    }
+
+    setIsUpdatingAsset(false);
+  }
+
+  async function deleteSelectedDraftAsset(asset: Asset) {
+    const confirmed = window.confirm(
+      `Delete draft upload "${asset.name}"? This removes the file before submission.`
+    );
+
+    if (!confirmed) return;
+
+    setIsUpdatingAsset(true);
+
+    const deleted = await deleteDraftAsset(asset);
+
+    if (deleted) {
+      await reloadCurrentProjectAssets();
+    }
+
+    setIsUpdatingAsset(false);
+  }
+
+  async function removeSelectedUnsafeAsset(asset: Asset) {
+    const confirmed = window.confirm(
+      `Remove "${asset.name}" from storage? This keeps an audit row but deletes the uploaded file.`
+    );
+
+    if (!confirmed) return;
+
+    setIsUpdatingAsset(true);
+
+    const removed = await removeUnsafeAsset(asset);
+
+    if (removed) {
+      await reloadCurrentProjectAssets();
+    }
+
+    setIsUpdatingAsset(false);
+  }
+
+  async function submitDraftAssetsForSelectedStage() {
+    if (!project?.id || !selectedStage) return true;
+
+    return submitDraftAssetsForStage({
+      projectId: project.id,
+      stageId: selectedStage.id,
+      stageTitle: selectedStage.title,
+    });
   }
 
   async function approveStage() {
@@ -508,6 +571,15 @@ export function useProductionProjects() {
 
   async function submitNewVersion() {
     if (!selectedStage || selectedStageBlocked) return;
+
+    const assetsSubmitted = await submitDraftAssetsForSelectedStage();
+
+    if (!assetsSubmitted) {
+      window.alert("Draft assets could not be submitted. Please try again.");
+      return;
+    }
+
+    await reloadCurrentProjectAssets();
 
     const versionNote = feedbackText.trim() || "Version submitted";
 
@@ -584,6 +656,9 @@ export function useProductionProjects() {
     approveSelectedAsset,
     rejectSelectedAsset,
     resubmitSelectedAsset,
+    withdrawSelectedAsset,
+    deleteSelectedDraftAsset,
+    removeSelectedUnsafeAsset,
     openStage,
     switchProject,
   };

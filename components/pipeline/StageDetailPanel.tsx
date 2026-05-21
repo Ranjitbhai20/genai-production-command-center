@@ -20,6 +20,9 @@ export function StageDetailPanel({
   onApproveAsset,
   onRejectAsset,
   onResubmitAsset,
+  onWithdrawAsset,
+  onDeleteDraftAsset,
+  onRemoveUnsafeAsset,
 }: {
   projectStatus?: "draft" | "in_production" | "complete";
   stages: Stage[];
@@ -38,6 +41,9 @@ export function StageDetailPanel({
   onApproveAsset?: (assetId: string) => void;
   onRejectAsset?: (assetId: string) => void;
   onResubmitAsset?: (assetId: string) => void;
+  onWithdrawAsset?: (assetId: string) => void;
+  onDeleteDraftAsset?: (asset: Asset) => void;
+  onRemoveUnsafeAsset?: (asset: Asset) => void;
 }) {
   const selectedStage = stages[selectedStageIndex];
 
@@ -58,6 +64,20 @@ export function StageDetailPanel({
 
   const linkedAssets = assets.filter(
     (asset) => asset.linkedStage === selectedStage.title
+  );
+
+  const draftAssets = linkedAssets.filter((asset) => asset.status === "Draft");
+  const submittedAssets = linkedAssets.filter(
+    (asset) => asset.status === "Submitted"
+  );
+  const reviewedAssets = linkedAssets.filter(
+    (asset) =>
+      asset.status !== "Draft" &&
+      asset.status !== "Submitted" &&
+      asset.status !== "Removed"
+  );
+  const removedAssets = linkedAssets.filter(
+    (asset) => asset.status === "Removed"
   );
 
   function handleAssetUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -204,7 +224,7 @@ export function StageDetailPanel({
             disabled={stageReadOnly}
             className="rounded-xl border border-green-800 bg-green-950 p-3 text-green-200 hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Approve
+            Approve Stage
           </button>
 
           <button
@@ -212,7 +232,7 @@ export function StageDetailPanel({
             disabled={stageReadOnly}
             className="rounded-xl border border-red-800 bg-red-950 p-3 text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Request Revision
+            Request Stage Revision
           </button>
         </div>
       </div>
@@ -227,8 +247,8 @@ export function StageDetailPanel({
         </div>
 
         <div className="mb-3 rounded-xl border border-dashed border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-500">
-          Upload references, generated visuals, clips, audio, or edit exports
-          for this selected stage.
+          Uploads start as draft assets. Drafts can be deleted before submission.
+          Once submitted, director review controls apply.
         </div>
 
         {onUploadAsset && (
@@ -239,7 +259,7 @@ export function StageDetailPanel({
                 : ""
             }`}
           >
-            {isUploadingAsset ? "Uploading Asset..." : "Upload Asset"}
+            {isUploadingAsset ? "Uploading Draft Asset..." : "Upload Draft Asset"}
 
             <input
               type="file"
@@ -250,84 +270,42 @@ export function StageDetailPanel({
           </label>
         )}
 
-        {linkedAssets.length > 0 && (
-          <div className="space-y-3">
-            {linkedAssets.map((asset) => (
-              <div
-                key={asset.id ?? asset.name}
-                className="rounded-xl border border-zinc-800 bg-zinc-900 p-3"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium">{asset.name}</p>
+        <AssetSection
+          title="Draft Uploads"
+          emptyText="No draft uploads yet."
+          assets={draftAssets}
+          isUpdatingAsset={isUpdatingAsset}
+          onDeleteDraftAsset={onDeleteDraftAsset}
+          onRemoveUnsafeAsset={onRemoveUnsafeAsset}
+        />
 
-                    <p className="mt-1 text-xs text-zinc-500">
-                      {asset.type}
-                    </p>
+        <AssetSection
+          title="Submitted for Review"
+          emptyText="No submitted assets awaiting review."
+          assets={submittedAssets}
+          isUpdatingAsset={isUpdatingAsset}
+          onApproveAsset={onApproveAsset}
+          onRejectAsset={onRejectAsset}
+          onWithdrawAsset={onWithdrawAsset}
+          onRemoveUnsafeAsset={onRemoveUnsafeAsset}
+        />
 
-                    {asset.createdAt && (
-                      <p className="mt-1 text-xs text-zinc-600">
-                        {new Date(asset.createdAt).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
+        <AssetSection
+          title="Review History"
+          emptyText="No reviewed assets yet."
+          assets={reviewedAssets}
+          isUpdatingAsset={isUpdatingAsset}
+          onResubmitAsset={onResubmitAsset}
+          onRemoveUnsafeAsset={onRemoveUnsafeAsset}
+        />
 
-                  <span
-                    className={`rounded-full border px-2 py-1 text-xs ${statusStyle(
-                      asset.status
-                    )}`}
-                  >
-                    {asset.status}
-                  </span>
-                </div>
-
-                {asset.publicUrl && (
-                  <a
-                    href={asset.publicUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 inline-flex text-xs text-zinc-400 underline hover:text-zinc-200"
-                  >
-                    Open Asset
-                  </a>
-                )}
-
-                {asset.id && !projectComplete && (
-                  <div className="mt-3 grid grid-cols-1 gap-2">
-                    {asset.status !== "Approved" && onApproveAsset && (
-                      <button
-                        onClick={() => onApproveAsset(asset.id!)}
-                        disabled={isUpdatingAsset}
-                        className="rounded-lg border border-green-800 bg-green-950 px-3 py-2 text-xs text-green-200 hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Approve Asset
-                      </button>
-                    )}
-
-                    {asset.status !== "Rejected" && onRejectAsset && (
-                      <button
-                        onClick={() => onRejectAsset(asset.id!)}
-                        disabled={isUpdatingAsset}
-                        className="rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-xs text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Reject Asset
-                      </button>
-                    )}
-
-                    {asset.status === "Rejected" && onResubmitAsset && (
-                      <button
-                        onClick={() => onResubmitAsset(asset.id!)}
-                        disabled={isUpdatingAsset}
-                        className="rounded-lg border border-purple-800 bg-purple-950 px-3 py-2 text-xs text-purple-200 hover:bg-purple-900 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Mark Submitted Again
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+        {removedAssets.length > 0 && (
+          <AssetSection
+            title="Removed Records"
+            emptyText="No removed asset records."
+            assets={removedAssets}
+            isUpdatingAsset={isUpdatingAsset}
+          />
         )}
       </div>
 
@@ -370,6 +348,184 @@ export function StageDetailPanel({
         </div>
       </details>
     </aside>
+  );
+}
+
+function AssetSection({
+  title,
+  emptyText,
+  assets,
+  isUpdatingAsset,
+  onApproveAsset,
+  onRejectAsset,
+  onResubmitAsset,
+  onWithdrawAsset,
+  onDeleteDraftAsset,
+  onRemoveUnsafeAsset,
+}: {
+  title: string;
+  emptyText: string;
+  assets: Asset[];
+  isUpdatingAsset?: boolean;
+  onApproveAsset?: (assetId: string) => void;
+  onRejectAsset?: (assetId: string) => void;
+  onResubmitAsset?: (assetId: string) => void;
+  onWithdrawAsset?: (assetId: string) => void;
+  onDeleteDraftAsset?: (asset: Asset) => void;
+  onRemoveUnsafeAsset?: (asset: Asset) => void;
+}) {
+  return (
+    <div className="mb-5">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-sm font-medium text-zinc-300">{title}</p>
+        <span className="text-xs text-zinc-600">{assets.length}</span>
+      </div>
+
+      {assets.length === 0 && (
+        <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900 p-3 text-xs text-zinc-500">
+          {emptyText}
+        </div>
+      )}
+
+      {assets.length > 0 && (
+        <div className="space-y-3">
+          {assets.map((asset) => (
+            <AssetCard
+              key={asset.id ?? asset.name}
+              asset={asset}
+              isUpdatingAsset={isUpdatingAsset}
+              onApproveAsset={onApproveAsset}
+              onRejectAsset={onRejectAsset}
+              onResubmitAsset={onResubmitAsset}
+              onWithdrawAsset={onWithdrawAsset}
+              onDeleteDraftAsset={onDeleteDraftAsset}
+              onRemoveUnsafeAsset={onRemoveUnsafeAsset}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AssetCard({
+  asset,
+  isUpdatingAsset,
+  onApproveAsset,
+  onRejectAsset,
+  onResubmitAsset,
+  onWithdrawAsset,
+  onDeleteDraftAsset,
+  onRemoveUnsafeAsset,
+}: {
+  asset: Asset;
+  isUpdatingAsset?: boolean;
+  onApproveAsset?: (assetId: string) => void;
+  onRejectAsset?: (assetId: string) => void;
+  onResubmitAsset?: (assetId: string) => void;
+  onWithdrawAsset?: (assetId: string) => void;
+  onDeleteDraftAsset?: (asset: Asset) => void;
+  onRemoveUnsafeAsset?: (asset: Asset) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-medium">{asset.name}</p>
+
+          <p className="mt-1 text-xs text-zinc-500">{asset.type}</p>
+
+          {asset.createdAt && (
+            <p className="mt-1 text-xs text-zinc-600">
+              {new Date(asset.createdAt).toLocaleString()}
+            </p>
+          )}
+        </div>
+
+        <span
+          className={`rounded-full border px-2 py-1 text-xs ${statusStyle(
+            asset.status
+          )}`}
+        >
+          {asset.status}
+        </span>
+      </div>
+
+      {asset.publicUrl && (
+        <a
+          href={asset.publicUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex text-xs text-zinc-400 underline hover:text-zinc-200"
+        >
+          Open Asset
+        </a>
+      )}
+
+      {asset.id && (
+        <div className="mt-3 grid grid-cols-1 gap-2">
+          {asset.status === "Draft" && onDeleteDraftAsset && (
+            <button
+              onClick={() => onDeleteDraftAsset(asset)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Delete Draft Upload
+            </button>
+          )}
+
+          {asset.status === "Submitted" && onApproveAsset && (
+            <button
+              onClick={() => onApproveAsset(asset.id!)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-green-800 bg-green-950 px-3 py-2 text-xs text-green-200 hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Approve Asset
+            </button>
+          )}
+
+          {asset.status === "Submitted" && onRejectAsset && (
+            <button
+              onClick={() => onRejectAsset(asset.id!)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-xs text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Reject Asset
+            </button>
+          )}
+
+          {asset.status === "Rejected" && onResubmitAsset && (
+            <button
+              onClick={() => onResubmitAsset(asset.id!)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-purple-800 bg-purple-950 px-3 py-2 text-xs text-purple-200 hover:bg-purple-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Mark Submitted Again
+            </button>
+          )}
+
+          {asset.status === "Submitted" && onWithdrawAsset && (
+            <button
+              onClick={() => onWithdrawAsset(asset.id!)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-yellow-800 bg-yellow-950 px-3 py-2 text-xs text-yellow-200 hover:bg-yellow-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Withdraw Submission
+            </button>
+          )}
+
+          {asset.status !== "Removed" && onRemoveUnsafeAsset && (
+            <button
+              onClick={() => onRemoveUnsafeAsset(asset)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-red-950 bg-black px-3 py-2 text-xs text-red-300 hover:bg-red-950 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Remove Unsafe File
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

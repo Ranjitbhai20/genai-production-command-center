@@ -22,6 +22,9 @@ export function PipelineView({
   onApproveAsset,
   onRejectAsset,
   onResubmitAsset,
+  onWithdrawAsset,
+  onDeleteDraftAsset,
+  onRemoveUnsafeAsset,
 }: {
   project: Project;
   stages: Stage[];
@@ -41,6 +44,9 @@ export function PipelineView({
   onApproveAsset?: (assetId: string) => void;
   onRejectAsset?: (assetId: string) => void;
   onResubmitAsset?: (assetId: string) => void;
+  onWithdrawAsset?: (assetId: string) => void;
+  onDeleteDraftAsset?: (asset: Asset) => void;
+  onRemoveUnsafeAsset?: (asset: Asset) => void;
 }) {
   const approvedCount = stages.filter(
     (stage) => stage.status === "Approved"
@@ -54,16 +60,28 @@ export function PipelineView({
     (stage) => stage.status === "Needs Revalidation"
   ).length;
 
-  const approvedAssetCount = assets.filter(
-    (asset) => asset.status === "Approved"
+  const draftAssetCount = assets.filter(
+    (asset) => asset.status === "Draft"
   ).length;
 
   const submittedAssetCount = assets.filter(
     (asset) => asset.status === "Submitted"
   ).length;
 
+  const approvedAssetCount = assets.filter(
+    (asset) => asset.status === "Approved"
+  ).length;
+
   const rejectedAssetCount = assets.filter(
     (asset) => asset.status === "Rejected"
+  ).length;
+
+  const withdrawnAssetCount = assets.filter(
+    (asset) => asset.status === "Withdrawn"
+  ).length;
+
+  const removedAssetCount = assets.filter(
+    (asset) => asset.status === "Removed"
   ).length;
 
   const archived = project.status === "complete";
@@ -94,18 +112,29 @@ export function PipelineView({
 
       <div className="mb-8 grid grid-cols-4 gap-4">
         <MetricCard label="Assets" value={assets.length} />
-        <MetricCard label="Asset Approved" value={approvedAssetCount} />
-        <MetricCard label="Asset Submitted" value={submittedAssetCount} />
-        <MetricCard label="Asset Rejected" value={rejectedAssetCount} />
+        <MetricCard label="Draft Assets" value={draftAssetCount} />
+        <MetricCard label="Submitted Assets" value={submittedAssetCount} />
+        <MetricCard label="Approved Assets" value={approvedAssetCount} />
       </div>
+
+      {(rejectedAssetCount > 0 ||
+        withdrawnAssetCount > 0 ||
+        removedAssetCount > 0) && (
+        <div className="mb-8 grid grid-cols-3 gap-4">
+          <MetricCard label="Rejected Assets" value={rejectedAssetCount} />
+          <MetricCard label="Withdrawn Assets" value={withdrawnAssetCount} />
+          <MetricCard label="Removed Records" value={removedAssetCount} />
+        </div>
+      )}
 
       <div className="mb-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
         <p className="mb-2 text-sm text-zinc-500">Production Logic</p>
 
         <p className="text-zinc-300">
-          Brief approval unlocks the pipeline. Stage submissions, approvals,
-          rejections, uploaded assets, asset review status, and final handoff are
-          preserved as production memory.
+          Uploads begin as draft assets. Drafts can be deleted before
+          submission. Submitting a version moves draft assets into review.
+          Director review then approves, rejects, withdraws, or removes unsafe
+          files while preserving production memory.
         </p>
       </div>
 
@@ -134,6 +163,9 @@ export function PipelineView({
           onApproveAsset={onApproveAsset}
           onRejectAsset={onRejectAsset}
           onResubmitAsset={onResubmitAsset}
+          onWithdrawAsset={onWithdrawAsset}
+          onDeleteDraftAsset={onDeleteDraftAsset}
+          onRemoveUnsafeAsset={onRemoveUnsafeAsset}
         />
       </div>
     </div>

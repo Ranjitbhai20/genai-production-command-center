@@ -52,6 +52,7 @@ export async function uploadAssetForStage({
 }) {
   const timestamp = Date.now();
   const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+
   const storagePath = `${
     projectId
   }/${stageId ?? "unlinked"}/${timestamp}_${safeFileName}`;
@@ -82,7 +83,7 @@ export async function uploadAssetForStage({
       stage_title: stageTitle,
       name: file.name,
       type: file.type || "unknown",
-      status: "Submitted",
+      status: "Draft",
       source: "Uploaded Asset",
       uploaded_by: uploadedBy ?? "Project User",
       storage_path: storagePath,
@@ -124,6 +125,111 @@ export async function updateAssetStatus({
   }
 
   return assetFromRow(data);
+}
+
+export async function submitDraftAssetsForStage({
+  projectId,
+  stageId,
+  stageTitle,
+}: {
+  projectId: string;
+  stageId?: string;
+  stageTitle: string;
+}) {
+  let query = supabase
+    .from("assets")
+    .update({
+      status: "Submitted",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("project_id", projectId)
+    .eq("status", "Draft");
+
+  if (stageId) {
+    query = query.eq("stage_id", stageId);
+  } else {
+    query = query.eq("stage_title", stageTitle);
+  }
+
+  const { error } = await query;
+
+  if (error) {
+    console.error("Failed to submit draft assets:", error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function deleteDraftAsset(asset: Asset) {
+  if (!asset.id) return false;
+
+  if (asset.status !== "Draft") {
+    console.error("Only draft assets can be deleted.");
+    return false;
+  }
+
+  if (asset.storagePath) {
+    const { error: storageError } = await supabase.storage
+      .from(ASSET_BUCKET)
+      .remove([asset.storagePath]);
+
+    if (storageError) {
+      console.error("Failed to delete asset file:", storageError);
+      return false;
+    }
+  }
+
+  const { error: deleteError } = await supabase
+    .from("assets")
+    .delete()
+    .eq("id", asset.id);
+
+  if (deleteError) {
+    console.error("Failed to delete draft asset row:", deleteError);
+    return false;
+  }
+
+  return true;
+}
+
+export async function removeUnsafeAsset(asset: Asset) {
+  if (!asset.id) return false;
+
+  if (asset.storagePath) {
+    const { error: storageError } = await supabase.storage
+      .from(ASSET_BUCKET)
+      .remove([asset.storagePath]);
+
+    if (storageError) {
+      console.error("Failed to remove unsafe asset file:", storageError);
+      return false;
+    }
+  }
+
+  const { error } = await supabase
+    .from("assets")
+    .update({
+      status: "Removed",
+      storage_path: null,
+      public_url: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", asset.id);
+
+  if (error) {
+    console.error("Failed to mark asset removed:", error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function withdrawAsset(assetId: string) {
+  return updateAssetStatus({
+    assetId,
+    status: "Withdrawn",
+  });
 }
 
 export async function approveAsset(assetId: string) {

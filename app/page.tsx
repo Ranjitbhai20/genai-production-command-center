@@ -43,6 +43,9 @@ export default function Home() {
     approveSelectedAsset,
     rejectSelectedAsset,
     resubmitSelectedAsset,
+    withdrawSelectedAsset,
+    deleteSelectedDraftAsset,
+    removeSelectedUnsafeAsset,
     openStage,
     switchProject,
   } = useProductionProjects();
@@ -91,6 +94,9 @@ export default function Home() {
           onApproveAsset={approveSelectedAsset}
           onRejectAsset={rejectSelectedAsset}
           onResubmitAsset={resubmitSelectedAsset}
+          onWithdrawAsset={withdrawSelectedAsset}
+          onDeleteDraftAsset={deleteSelectedDraftAsset}
+          onRemoveUnsafeAsset={removeSelectedUnsafeAsset}
         />
       );
     }
