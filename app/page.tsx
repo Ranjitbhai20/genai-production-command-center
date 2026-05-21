@@ -23,6 +23,7 @@ export default function Home() {
     showFinalHandoffModal,
     isLoadingProjects,
     isUploadingAsset,
+    isUpdatingAsset,
     setActiveProjectTab,
     setSelectedStageIndex,
     setFeedbackText,
@@ -39,6 +40,9 @@ export default function Home() {
     assignBackToWorker,
     confirmFinalHandoffApproval,
     uploadAsset,
+    approveSelectedAsset,
+    rejectSelectedAsset,
+    resubmitSelectedAsset,
     openStage,
     switchProject,
   } = useProductionProjects();
@@ -75,6 +79,7 @@ export default function Home() {
           selectedStageIndex={selectedStageIndex}
           feedbackText={feedbackText}
           isUploadingAsset={isUploadingAsset}
+          isUpdatingAsset={isUpdatingAsset}
           onSelectStage={setSelectedStageIndex}
           onFeedbackChange={setFeedbackText}
           onTakeDirectorControl={takeDirectorControl}
@@ -83,6 +88,9 @@ export default function Home() {
           onApproveStage={approveStage}
           onRejectLatestVersion={rejectLatestVersion}
           onUploadAsset={uploadAsset}
+          onApproveAsset={approveSelectedAsset}
+          onRejectAsset={rejectSelectedAsset}
+          onResubmitAsset={resubmitSelectedAsset}
         />
       );
     }

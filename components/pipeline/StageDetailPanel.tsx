@@ -9,6 +9,7 @@ export function StageDetailPanel({
   assets,
   feedbackText,
   isUploadingAsset,
+  isUpdatingAsset,
   onFeedbackChange,
   onTakeDirectorControl,
   onAssignBackToWorker,
@@ -16,6 +17,9 @@ export function StageDetailPanel({
   onApproveStage,
   onRejectLatestVersion,
   onUploadAsset,
+  onApproveAsset,
+  onRejectAsset,
+  onResubmitAsset,
 }: {
   projectStatus?: "draft" | "in_production" | "complete";
   stages: Stage[];
@@ -23,6 +27,7 @@ export function StageDetailPanel({
   assets: Asset[];
   feedbackText: string;
   isUploadingAsset?: boolean;
+  isUpdatingAsset?: boolean;
   onFeedbackChange: (value: string) => void;
   onTakeDirectorControl?: () => void;
   onAssignBackToWorker?: () => void;
@@ -30,6 +35,9 @@ export function StageDetailPanel({
   onApproveStage: () => void;
   onRejectLatestVersion: () => void;
   onUploadAsset?: (file: File) => void;
+  onApproveAsset?: (assetId: string) => void;
+  onRejectAsset?: (assetId: string) => void;
+  onResubmitAsset?: (assetId: string) => void;
 }) {
   const selectedStage = stages[selectedStageIndex];
 
@@ -282,6 +290,40 @@ export function StageDetailPanel({
                   >
                     Open Asset
                   </a>
+                )}
+
+                {asset.id && !projectComplete && (
+                  <div className="mt-3 grid grid-cols-1 gap-2">
+                    {asset.status !== "Approved" && onApproveAsset && (
+                      <button
+                        onClick={() => onApproveAsset(asset.id!)}
+                        disabled={isUpdatingAsset}
+                        className="rounded-lg border border-green-800 bg-green-950 px-3 py-2 text-xs text-green-200 hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Approve Asset
+                      </button>
+                    )}
+
+                    {asset.status !== "Rejected" && onRejectAsset && (
+                      <button
+                        onClick={() => onRejectAsset(asset.id!)}
+                        disabled={isUpdatingAsset}
+                        className="rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-xs text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Reject Asset
+                      </button>
+                    )}
+
+                    {asset.status === "Rejected" && onResubmitAsset && (
+                      <button
+                        onClick={() => onResubmitAsset(asset.id!)}
+                        disabled={isUpdatingAsset}
+                        className="rounded-lg border border-purple-800 bg-purple-950 px-3 py-2 text-xs text-purple-200 hover:bg-purple-900 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Mark Submitted Again
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             ))}

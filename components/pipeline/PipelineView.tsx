@@ -10,6 +10,7 @@ export function PipelineView({
   selectedStageIndex,
   feedbackText,
   isUploadingAsset,
+  isUpdatingAsset,
   onSelectStage,
   onFeedbackChange,
   onTakeDirectorControl,
@@ -18,6 +19,9 @@ export function PipelineView({
   onApproveStage,
   onRejectLatestVersion,
   onUploadAsset,
+  onApproveAsset,
+  onRejectAsset,
+  onResubmitAsset,
 }: {
   project: Project;
   stages: Stage[];
@@ -25,6 +29,7 @@ export function PipelineView({
   selectedStageIndex: number;
   feedbackText: string;
   isUploadingAsset?: boolean;
+  isUpdatingAsset?: boolean;
   onSelectStage: (index: number) => void;
   onFeedbackChange: (value: string) => void;
   onTakeDirectorControl: () => void;
@@ -33,6 +38,9 @@ export function PipelineView({
   onApproveStage: () => void;
   onRejectLatestVersion: () => void;
   onUploadAsset?: (file: File) => void;
+  onApproveAsset?: (assetId: string) => void;
+  onRejectAsset?: (assetId: string) => void;
+  onResubmitAsset?: (assetId: string) => void;
 }) {
   const approvedCount = stages.filter(
     (stage) => stage.status === "Approved"
@@ -44,6 +52,18 @@ export function PipelineView({
 
   const revalidationCount = stages.filter(
     (stage) => stage.status === "Needs Revalidation"
+  ).length;
+
+  const approvedAssetCount = assets.filter(
+    (asset) => asset.status === "Approved"
+  ).length;
+
+  const submittedAssetCount = assets.filter(
+    (asset) => asset.status === "Submitted"
+  ).length;
+
+  const rejectedAssetCount = assets.filter(
+    (asset) => asset.status === "Rejected"
   ).length;
 
   const archived = project.status === "complete";
@@ -72,13 +92,20 @@ export function PipelineView({
         <MetricCard label="Revalidation" value={revalidationCount} />
       </div>
 
+      <div className="mb-8 grid grid-cols-4 gap-4">
+        <MetricCard label="Assets" value={assets.length} />
+        <MetricCard label="Asset Approved" value={approvedAssetCount} />
+        <MetricCard label="Asset Submitted" value={submittedAssetCount} />
+        <MetricCard label="Asset Rejected" value={rejectedAssetCount} />
+      </div>
+
       <div className="mb-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
         <p className="mb-2 text-sm text-zinc-500">Production Logic</p>
 
         <p className="text-zinc-300">
-          Brief approval unlocks the pipeline. Script approval unlocks the
-          production floor. Stage submissions, approvals, rejections, assets,
-          and final handoff are preserved as production memory.
+          Brief approval unlocks the pipeline. Stage submissions, approvals,
+          rejections, uploaded assets, asset review status, and final handoff are
+          preserved as production memory.
         </p>
       </div>
 
@@ -96,6 +123,7 @@ export function PipelineView({
           assets={assets}
           feedbackText={feedbackText}
           isUploadingAsset={isUploadingAsset}
+          isUpdatingAsset={isUpdatingAsset}
           onFeedbackChange={onFeedbackChange}
           onTakeDirectorControl={onTakeDirectorControl}
           onAssignBackToWorker={onAssignBackToWorker}
@@ -103,6 +131,9 @@ export function PipelineView({
           onApproveStage={onApproveStage}
           onRejectLatestVersion={onRejectLatestVersion}
           onUploadAsset={onUploadAsset}
+          onApproveAsset={onApproveAsset}
+          onRejectAsset={onRejectAsset}
+          onResubmitAsset={onResubmitAsset}
         />
       </div>
     </div>

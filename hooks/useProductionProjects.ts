@@ -22,7 +22,10 @@ import {
   saveStagesForProject,
 } from "@/lib/stagePersistence";
 import {
+  approveAsset,
   loadAssetsForProject,
+  rejectAsset,
+  resubmitAsset,
   uploadAssetForStage,
 } from "@/lib/assetPersistence";
 
@@ -68,6 +71,7 @@ export function useProductionProjects() {
   const [showFinalHandoffModal, setShowFinalHandoffModal] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isUploadingAsset, setIsUploadingAsset] = useState(false);
+  const [isUpdatingAsset, setIsUpdatingAsset] = useState(false);
 
   const project =
     selectedProjectIndex >= 0 && selectedProjectIndex < projects.length
@@ -399,6 +403,42 @@ export function useProductionProjects() {
     setIsUploadingAsset(false);
   }
 
+  async function approveSelectedAsset(assetId: string) {
+    setIsUpdatingAsset(true);
+
+    const updatedAsset = await approveAsset(assetId);
+
+    if (updatedAsset) {
+      await reloadCurrentProjectAssets();
+    }
+
+    setIsUpdatingAsset(false);
+  }
+
+  async function rejectSelectedAsset(assetId: string) {
+    setIsUpdatingAsset(true);
+
+    const updatedAsset = await rejectAsset(assetId);
+
+    if (updatedAsset) {
+      await reloadCurrentProjectAssets();
+    }
+
+    setIsUpdatingAsset(false);
+  }
+
+  async function resubmitSelectedAsset(assetId: string) {
+    setIsUpdatingAsset(true);
+
+    const updatedAsset = await resubmitAsset(assetId);
+
+    if (updatedAsset) {
+      await reloadCurrentProjectAssets();
+    }
+
+    setIsUpdatingAsset(false);
+  }
+
   async function approveStage() {
     if (!selectedStage || selectedStageBlocked) return;
 
@@ -524,6 +564,7 @@ export function useProductionProjects() {
     showFinalHandoffModal,
     isLoadingProjects,
     isUploadingAsset,
+    isUpdatingAsset,
     setActiveProjectTab,
     setSelectedStageIndex,
     setFeedbackText,
@@ -540,6 +581,9 @@ export function useProductionProjects() {
     assignBackToWorker,
     confirmFinalHandoffApproval,
     uploadAsset,
+    approveSelectedAsset,
+    rejectSelectedAsset,
+    resubmitSelectedAsset,
     openStage,
     switchProject,
   };

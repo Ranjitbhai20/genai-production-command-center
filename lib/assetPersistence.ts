@@ -52,7 +52,9 @@ export async function uploadAssetForStage({
 }) {
   const timestamp = Date.now();
   const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const storagePath = `${projectId}/${stageId ?? "unlinked"}/${timestamp}_${safeFileName}`;
+  const storagePath = `${
+    projectId
+  }/${stageId ?? "unlinked"}/${timestamp}_${safeFileName}`;
 
   const { error: uploadError } = await supabase.storage
     .from(ASSET_BUCKET)
@@ -86,6 +88,7 @@ export async function uploadAssetForStage({
       storage_path: storagePath,
       public_url: publicUrl,
       size_bytes: file.size,
+      updated_at: new Date().toISOString(),
     })
     .select()
     .single();
@@ -96,4 +99,50 @@ export async function uploadAssetForStage({
   }
 
   return assetFromRow(assetRow);
+}
+
+export async function updateAssetStatus({
+  assetId,
+  status,
+}: {
+  assetId: string;
+  status: StageStatus;
+}) {
+  const { data, error } = await supabase
+    .from("assets")
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", assetId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to update asset status:", error);
+    return null;
+  }
+
+  return assetFromRow(data);
+}
+
+export async function approveAsset(assetId: string) {
+  return updateAssetStatus({
+    assetId,
+    status: "Approved",
+  });
+}
+
+export async function rejectAsset(assetId: string) {
+  return updateAssetStatus({
+    assetId,
+    status: "Rejected",
+  });
+}
+
+export async function resubmitAsset(assetId: string) {
+  return updateAssetStatus({
+    assetId,
+    status: "Submitted",
+  });
 }
