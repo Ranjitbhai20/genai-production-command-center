@@ -8,6 +8,7 @@ import { FinalHandoffConfirmModal } from "@/components/pipeline/FinalHandoffConf
 import { AssetsView } from "@/components/assets/AssetsView";
 import { ApprovalsView } from "@/components/approvals/ApprovalsView";
 import { HandoffView } from "@/components/handoff/HandoffView";
+import { WorkerWorkspaceView } from "@/components/worker/WorkerWorkspaceView";
 import { getFinalHandoffCheck } from "@/lib/pipelineLogic";
 import { useProductionProjects } from "@/hooks/useProductionProjects";
 
@@ -29,8 +30,6 @@ export default function Home() {
     setFeedbackText,
     setShowFinalHandoffModal,
     createNewProject,
-    renameCurrentProject,
-    deleteCurrentProject,
     saveBrief,
     approveBrief,
     approveStage,
@@ -99,6 +98,10 @@ export default function Home() {
       );
     }
 
+    if (activeProjectTab === "worker") {
+      return <WorkerWorkspaceView project={project} />;
+    }
+
     if (activeProjectTab === "assets") {
       return <AssetsView project={project} />;
     }
@@ -163,29 +166,6 @@ export default function Home() {
       />
 
       <section className="flex-1 p-6">
-        <div className="mb-4 flex gap-3">
-          <button
-            onClick={createNewProject}
-            className="rounded-xl bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
-          >
-            New Production
-          </button>
-
-          <button
-            onClick={renameCurrentProject}
-            className="rounded-xl bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
-          >
-            Rename
-          </button>
-
-          <button
-            onClick={deleteCurrentProject}
-            className="rounded-xl bg-red-900 px-4 py-2 text-sm hover:bg-red-800"
-          >
-            Delete
-          </button>
-        </div>
-
         {renderProjectTab()}
       </section>
 

@@ -12,6 +12,7 @@ export type StageStatus =
 export type ProjectTab =
   | "brief"
   | "pipeline"
+  | "worker"
   | "assets"
   | "approvals"
   | "handoff";

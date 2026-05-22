@@ -24,7 +24,6 @@ export function PipelineView({
   onResubmitAsset,
   onWithdrawAsset,
   onDeleteDraftAsset,
-  onRemoveUnsafeAsset,
 }: {
   project: Project;
   stages: Stage[];
@@ -46,7 +45,6 @@ export function PipelineView({
   onResubmitAsset?: (assetId: string) => void;
   onWithdrawAsset?: (assetId: string) => void;
   onDeleteDraftAsset?: (asset: Asset) => void;
-  onRemoveUnsafeAsset?: (asset: Asset) => void;
 }) {
   const approvedCount = stages.filter(
     (stage) => stage.status === "Approved"
@@ -85,6 +83,16 @@ export function PipelineView({
   ).length;
 
   const archived = project.status === "complete";
+
+  function handleDirectorControl(index: number) {
+    onSelectStage(index);
+    onTakeDirectorControl();
+  }
+
+  function handleAssignToWorker(index: number) {
+    onSelectStage(index);
+    onAssignBackToWorker();
+  }
 
   return (
     <div>
@@ -131,10 +139,9 @@ export function PipelineView({
         <p className="mb-2 text-sm text-zinc-500">Production Logic</p>
 
         <p className="text-zinc-300">
-          Uploads begin as draft assets. Drafts can be deleted before
-          submission. Submitting a version moves draft assets into review.
-          Director review then approves, rejects, withdraws, or removes unsafe
-          files while preserving production memory.
+          Director controls ownership from the pipeline. Worker assignments
+          appear in the Worker Workspace. Review notes, approvals, rejections,
+          and submitted assets remain preserved as production memory.
         </p>
       </div>
 
@@ -143,6 +150,8 @@ export function PipelineView({
           stages={stages}
           selectedStageIndex={selectedStageIndex}
           onSelectStage={onSelectStage}
+          onTakeDirectorControl={handleDirectorControl}
+          onAssignToWorker={handleAssignToWorker}
         />
 
         <StageDetailPanel
@@ -154,8 +163,6 @@ export function PipelineView({
           isUploadingAsset={isUploadingAsset}
           isUpdatingAsset={isUpdatingAsset}
           onFeedbackChange={onFeedbackChange}
-          onTakeDirectorControl={onTakeDirectorControl}
-          onAssignBackToWorker={onAssignBackToWorker}
           onSubmitNewVersion={onSubmitNewVersion}
           onApproveStage={onApproveStage}
           onRejectLatestVersion={onRejectLatestVersion}
@@ -165,7 +172,6 @@ export function PipelineView({
           onResubmitAsset={onResubmitAsset}
           onWithdrawAsset={onWithdrawAsset}
           onDeleteDraftAsset={onDeleteDraftAsset}
-          onRemoveUnsafeAsset={onRemoveUnsafeAsset}
         />
       </div>
     </div>
