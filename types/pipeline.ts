@@ -65,6 +65,15 @@ export type VisualStyle =
   | "Animation"
   | "Mixed";
 
+export type AssignmentStatus =
+  | "none"
+  | "active"
+  | "submitted"
+  | "approved"
+  | "rejected"
+  | "revoked"
+  | "expired";
+
 export type Version = {
   label: string;
   status: StageStatus;
@@ -88,6 +97,13 @@ export type Stage = {
 
   assignedWorker: string;
   accessLevel: string;
+
+  assignmentKey?: string;
+  assignmentStatus?: AssignmentStatus;
+  assignmentKeyCreatedAt?: string;
+  assignmentKeyExpiresAt?: string;
+  assignmentActivatedAt?: string;
+  assignmentSubmittedAt?: string;
 
   taskBrief: string;
   description: string;

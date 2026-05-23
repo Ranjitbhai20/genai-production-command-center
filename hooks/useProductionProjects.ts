@@ -13,7 +13,8 @@ import {
   approveStage as approveStageLogic,
   assignBackToWorker as assignBackToWorkerLogic,
   isStageBlocked,
-  rejectLatestVersion as rejectLatestVersionLogic,
+  rejectAndTakeDirectorControl as rejectAndTakeDirectorControlLogic,
+  requestRevision as requestRevisionLogic,
   submitNewVersion as submitNewVersionLogic,
   takeDirectorControl as takeDirectorControlLogic,
 } from "@/lib/pipelineLogic";
@@ -416,7 +417,7 @@ export function useProductionProjects() {
       stageId: selectedStage.id,
       stageTitle: selectedStage.title,
       file,
-      uploadedBy: selectedStage.assignedWorker || project.ownerName,
+      uploadedBy: selectedStage.owner || project.ownerName,
     });
 
     if (uploadedAsset) {
@@ -574,7 +575,7 @@ export function useProductionProjects() {
       return;
     }
 
-    const rejectedStages = rejectLatestVersionLogic(
+    const rejectedStages = requestRevisionLogic(
       stages,
       selectedStageIndex,
       revisionNote
@@ -582,6 +583,26 @@ export function useProductionProjects() {
 
     await updateCurrentProjectStages(
       withStageNote(rejectedStages, selectedStageIndex, revisionNote)
+    );
+
+    setFeedbackText("");
+  }
+
+  async function rejectAndTakeDirectorControl() {
+    if (!selectedStage || selectedStageBlocked) return;
+
+    const takeoverNote =
+      feedbackText.trim() ||
+      "Worker submission rejected. Director has taken back control.";
+
+    const nextStages = rejectAndTakeDirectorControlLogic(
+      stages,
+      selectedStageIndex,
+      takeoverNote
+    );
+
+    await updateCurrentProjectStages(
+      withStageNote(nextStages, selectedStageIndex, takeoverNote)
     );
 
     setFeedbackText("");
@@ -667,6 +688,7 @@ export function useProductionProjects() {
     approveBrief,
     approveStage,
     rejectLatestVersion,
+    rejectAndTakeDirectorControl,
     submitNewVersion,
     takeDirectorControl,
     assignBackToWorker,

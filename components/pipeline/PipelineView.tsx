@@ -46,38 +46,27 @@ export function PipelineView({
   onWithdrawAsset?: (assetId: string) => void;
   onDeleteDraftAsset?: (asset: Asset) => void;
 }) {
-  const approvedCount = stages.filter(
-    (stage) => stage.status === "Approved"
-  ).length;
+  const selectedStage = stages[selectedStageIndex];
 
-  const submittedCount = stages.filter(
-    (stage) => stage.status === "Submitted"
-  ).length;
-
+  const approvedCount = stages.filter((stage) => stage.status === "Approved").length;
+  const submittedCount = stages.filter((stage) => stage.status === "Submitted").length;
   const revalidationCount = stages.filter(
     (stage) => stage.status === "Needs Revalidation"
   ).length;
 
-  const draftAssetCount = assets.filter(
-    (asset) => asset.status === "Draft"
-  ).length;
-
+  const draftAssetCount = assets.filter((asset) => asset.status === "Draft").length;
   const submittedAssetCount = assets.filter(
     (asset) => asset.status === "Submitted"
   ).length;
-
   const approvedAssetCount = assets.filter(
     (asset) => asset.status === "Approved"
   ).length;
-
   const rejectedAssetCount = assets.filter(
     (asset) => asset.status === "Rejected"
   ).length;
-
   const withdrawnAssetCount = assets.filter(
     (asset) => asset.status === "Withdrawn"
   ).length;
-
   const removedAssetCount = assets.filter(
     (asset) => asset.status === "Removed"
   ).length;
@@ -100,10 +89,7 @@ export function PipelineView({
 
       {archived && (
         <div className="mb-8 rounded-2xl border border-zinc-700 bg-zinc-900 p-5">
-          <p className="text-sm font-semibold text-white">
-            Production Archived
-          </p>
-
+          <p className="text-sm font-semibold text-white">Production Archived</p>
           <p className="mt-2 text-sm text-zinc-400">
             Final handoff is complete. This production is now preserved as a
             read-only database record.
@@ -137,7 +123,6 @@ export function PipelineView({
 
       <div className="mb-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
         <p className="mb-2 text-sm text-zinc-500">Production Logic</p>
-
         <p className="text-zinc-300">
           Director controls ownership from the pipeline. Worker assignments
           appear in the Worker Workspace. Review notes, approvals, rejections,
@@ -154,26 +139,70 @@ export function PipelineView({
           onAssignToWorker={handleAssignToWorker}
         />
 
-        <StageDetailPanel
-          projectStatus={project.status}
-          stages={stages}
-          selectedStageIndex={selectedStageIndex}
-          assets={assets}
-          feedbackText={feedbackText}
-          isUploadingAsset={isUploadingAsset}
-          isUpdatingAsset={isUpdatingAsset}
-          onFeedbackChange={onFeedbackChange}
-          onSubmitNewVersion={onSubmitNewVersion}
-          onApproveStage={onApproveStage}
-          onRejectLatestVersion={onRejectLatestVersion}
-          onUploadAsset={onUploadAsset}
-          onApproveAsset={onApproveAsset}
-          onRejectAsset={onRejectAsset}
-          onResubmitAsset={onResubmitAsset}
-          onWithdrawAsset={onWithdrawAsset}
-          onDeleteDraftAsset={onDeleteDraftAsset}
-        />
+        <div className="space-y-5">
+          {selectedStage?.assignmentKey &&
+            selectedStage.assignmentStatus === "active" && (
+              <AssignmentKeyCard stage={selectedStage} />
+            )}
+
+          <StageDetailPanel
+            projectStatus={project.status}
+            stages={stages}
+            selectedStageIndex={selectedStageIndex}
+            assets={assets}
+            feedbackText={feedbackText}
+            isUploadingAsset={isUploadingAsset}
+            isUpdatingAsset={isUpdatingAsset}
+            onFeedbackChange={onFeedbackChange}
+            onSubmitNewVersion={onSubmitNewVersion}
+            onApproveStage={onApproveStage}
+            onRejectLatestVersion={onRejectLatestVersion}
+            onUploadAsset={onUploadAsset}
+            onApproveAsset={onApproveAsset}
+            onRejectAsset={onRejectAsset}
+            onResubmitAsset={onResubmitAsset}
+            onWithdrawAsset={onWithdrawAsset}
+            onDeleteDraftAsset={onDeleteDraftAsset}
+          />
+        </div>
       </div>
+    </div>
+  );
+}
+
+function AssignmentKeyCard({ stage }: { stage: Stage }) {
+  async function copyKey() {
+    if (!stage.assignmentKey) return;
+    await navigator.clipboard.writeText(stage.assignmentKey);
+    window.alert("Assignment key copied.");
+  }
+
+  return (
+    <div className="rounded-2xl border border-blue-800 bg-blue-950/40 p-5">
+      <p className="text-sm font-semibold text-blue-200">
+        Worker Assignment Key
+      </p>
+
+      <div className="mt-3 flex items-center gap-2">
+        <code className="min-w-0 flex-1 rounded-xl border border-blue-900 bg-black px-3 py-2 text-sm text-blue-100">
+          {stage.assignmentKey}
+        </code>
+
+        <button
+          type="button"
+          onClick={copyKey}
+          className="rounded-xl border border-blue-700 bg-blue-950 px-3 py-2 text-sm text-blue-200 hover:bg-blue-900"
+        >
+          Copy
+        </button>
+      </div>
+
+      <p className="mt-3 text-xs text-blue-300/80">
+        Expires:{" "}
+        {stage.assignmentKeyExpiresAt
+          ? new Date(stage.assignmentKeyExpiresAt).toLocaleString()
+          : "24 hours after creation"}
+      </p>
     </div>
   );
 }
@@ -182,7 +211,6 @@ function MetricCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
       <p className="text-sm text-zinc-500">{label}</p>
-
       <p className="text-3xl font-bold">{value}</p>
     </div>
   );

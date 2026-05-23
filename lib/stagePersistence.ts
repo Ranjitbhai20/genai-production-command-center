@@ -30,6 +30,13 @@ export function stageFromRow(row: any): Stage {
 
     versions: row.versions ?? [],
 
+    assignmentKey: row.assignment_key ?? undefined,
+    assignmentStatus: row.assignment_status ?? undefined,
+    assignmentKeyCreatedAt: row.assignment_key_created_at ?? undefined,
+    assignmentKeyExpiresAt: row.assignment_key_expires_at ?? undefined,
+    assignmentActivatedAt: row.assignment_activated_at ?? undefined,
+    assignmentSubmittedAt: row.assignment_submitted_at ?? undefined,
+
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -44,9 +51,6 @@ export function stageToRow(stage: Stage, projectId: string, position: number) {
     owner: stage.owner ?? "Project Owner",
     default_worker: stage.defaultWorker ?? "",
 
-    // Database compatibility only.
-    // The frontend no longer uses approvalAuthority,
-    // but Supabase still requires approval_authority as NOT NULL.
     approval_authority: "Project Owner",
 
     status: stage.status,
@@ -64,6 +68,13 @@ export function stageToRow(stage: Stage, projectId: string, position: number) {
     notes: stage.notes ?? "",
 
     versions: stage.versions ?? [],
+
+    assignment_key: stage.assignmentKey ?? null,
+    assignment_status: stage.assignmentStatus ?? null,
+    assignment_key_created_at: stage.assignmentKeyCreatedAt ?? null,
+    assignment_key_expires_at: stage.assignmentKeyExpiresAt ?? null,
+    assignment_activated_at: stage.assignmentActivatedAt ?? null,
+    assignment_submitted_at: stage.assignmentSubmittedAt ?? null,
 
     updated_at: new Date().toISOString(),
   };

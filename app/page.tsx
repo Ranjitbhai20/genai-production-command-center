@@ -137,10 +137,6 @@ export default function Home() {
         </button>
 
         <WorkerWorkspaceView projects={projects} />
-
-        <FloatingWorkspaceButtons onOpenWorkerWorkspace={openWorkerWorkspace} />
-
-        <DataViewButton projects={projects} />
       </main>
     );
   }
@@ -174,7 +170,6 @@ export default function Home() {
         </div>
 
         <FloatingWorkspaceButtons onOpenWorkerWorkspace={openWorkerWorkspace} />
-
         <DataViewButton projects={projects} />
       </main>
     );
@@ -195,7 +190,6 @@ export default function Home() {
       <section className="flex-1 p-6">{renderProjectTab()}</section>
 
       <FloatingWorkspaceButtons onOpenWorkerWorkspace={openWorkerWorkspace} />
-
       <DataViewButton projects={projects} />
 
       {showFinalHandoffModal && (

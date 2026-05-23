@@ -11,13 +11,11 @@ export function StageDetailPanel({
   isUploadingAsset,
   isUpdatingAsset,
   onFeedbackChange,
-  onSubmitNewVersion,
   onApproveStage,
   onRejectLatestVersion,
   onUploadAsset,
   onApproveAsset,
   onRejectAsset,
-  onResubmitAsset,
   onWithdrawAsset,
   onDeleteDraftAsset,
 }: {
@@ -39,8 +37,6 @@ export function StageDetailPanel({
   onWithdrawAsset?: (assetId: string) => void;
   onDeleteDraftAsset?: (asset: Asset) => void;
 }) {
-  void onSubmitNewVersion;
-
   const selectedStage = stages[selectedStageIndex];
 
   if (!selectedStage) {
@@ -55,15 +51,15 @@ export function StageDetailPanel({
   const selectedStageApproved = selectedStage.status === "Approved";
   const projectComplete = projectStatus === "complete";
 
-  const directorControlled =
-    !selectedStage.assignedWorker ||
-    selectedStage.assignedWorker === "Not assigned";
+  const directorControlled = selectedStage.owner === "Project Owner";
+  const workerControlled = !directorControlled;
+  const handledBy = directorControlled ? "Project Owner" : "Worker";
 
   const stageLocked =
     selectedStageBlocked || selectedStageApproved || projectComplete;
 
   const canApproveStage = !stageLocked;
-  const canRequestRevision = !stageLocked && !directorControlled;
+  const canRejectAndTakeOver = !stageLocked && workerControlled;
   const canUploadAsset = !stageLocked && Boolean(onUploadAsset);
 
   const linkedAssets = assets.filter(
@@ -76,11 +72,16 @@ export function StageDetailPanel({
     (asset) => asset.status === "Submitted"
   );
 
-  const reviewedAssets = linkedAssets.filter(
-    (asset) =>
-      asset.status !== "Draft" &&
-      asset.status !== "Submitted" &&
-      asset.status !== "Removed"
+  const approvedAssets = linkedAssets.filter(
+    (asset) => asset.status === "Approved"
+  );
+
+  const rejectedAssets = linkedAssets.filter(
+    (asset) => asset.status === "Rejected"
+  );
+
+  const withdrawnAssets = linkedAssets.filter(
+    (asset) => asset.status === "Withdrawn"
   );
 
   const removedAssets = linkedAssets.filter(
@@ -94,6 +95,16 @@ export function StageDetailPanel({
 
     onUploadAsset(file);
     event.target.value = "";
+  }
+
+  function handleRejectAndTakeOver() {
+    const confirmed = window.confirm(
+      "Reject this worker handoff and return the stage to director control?"
+    );
+
+    if (!confirmed) return;
+
+    onRejectLatestVersion();
   }
 
   return (
@@ -129,8 +140,15 @@ export function StageDetailPanel({
 
         {!stageLocked && directorControlled && (
           <Notice tone="neutral">
-            Director-controlled stage. You can approve it directly. Revision
-            requests are disabled unless this stage is assigned to a worker.
+            Director-controlled stage. You can approve it directly or assign it
+            to a worker.
+          </Notice>
+        )}
+
+        {!stageLocked && workerControlled && (
+          <Notice tone="neutral">
+            Worker-controlled stage. You can approve the stage, review submitted
+            assets, or reject the handoff and take control.
           </Notice>
         )}
       </div>
@@ -139,13 +157,7 @@ export function StageDetailPanel({
         <p className="mb-3 text-sm text-zinc-500">Responsibility</p>
 
         <div className="space-y-3 text-sm">
-          <InfoRow label="Owner" value={selectedStage.owner} />
-
-          <InfoRow
-            label="Assigned Worker"
-            value={selectedStage.assignedWorker}
-          />
-
+          <InfoRow label="Handled By" value={handledBy} />
           <InfoRow label="Access Level" value={selectedStage.accessLevel} />
         </div>
       </div>
@@ -204,17 +216,18 @@ export function StageDetailPanel({
           </button>
 
           <button
-            onClick={onRejectLatestVersion}
-            disabled={!canRequestRevision}
+            onClick={handleRejectAndTakeOver}
+            disabled={!canRejectAndTakeOver}
             className="rounded-xl border border-red-800 bg-red-950 p-3 text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Request Revision
+            Reject + Take Over
           </button>
         </div>
 
         {directorControlled && (
           <p className="mt-3 text-xs text-zinc-500">
-            Revision requests are only active when a worker submission exists.
+            Rejection controls activate after this stage is assigned to a
+            worker.
           </p>
         )}
       </div>
@@ -266,12 +279,27 @@ export function StageDetailPanel({
         />
 
         <AssetSection
-          title="Review History"
-          emptyText="No review history."
-          assets={reviewedAssets}
+          title="Approved Assets"
+          emptyText="No approved assets."
+          assets={approvedAssets}
           isUpdatingAsset={isUpdatingAsset}
-          onResubmitAsset={onResubmitAsset}
         />
+
+        <AssetSection
+          title="Rejected Assets"
+          emptyText="No rejected assets."
+          assets={rejectedAssets}
+          isUpdatingAsset={isUpdatingAsset}
+        />
+
+        {withdrawnAssets.length > 0 && (
+          <AssetSection
+            title="Withdrawn Assets"
+            emptyText="No withdrawn assets."
+            assets={withdrawnAssets}
+            isUpdatingAsset={isUpdatingAsset}
+          />
+        )}
 
         {removedAssets.length > 0 && (
           <AssetSection
@@ -293,7 +321,6 @@ function AssetSection({
   isUpdatingAsset,
   onApproveAsset,
   onRejectAsset,
-  onResubmitAsset,
   onWithdrawAsset,
   onDeleteDraftAsset,
 }: {
@@ -303,7 +330,6 @@ function AssetSection({
   isUpdatingAsset?: boolean;
   onApproveAsset?: (assetId: string) => void;
   onRejectAsset?: (assetId: string) => void;
-  onResubmitAsset?: (assetId: string) => void;
   onWithdrawAsset?: (assetId: string) => void;
   onDeleteDraftAsset?: (asset: Asset) => void;
 }) {
@@ -330,7 +356,6 @@ function AssetSection({
               isUpdatingAsset={isUpdatingAsset}
               onApproveAsset={onApproveAsset}
               onRejectAsset={onRejectAsset}
-              onResubmitAsset={onResubmitAsset}
               onWithdrawAsset={onWithdrawAsset}
               onDeleteDraftAsset={onDeleteDraftAsset}
             />
@@ -346,7 +371,6 @@ function AssetCard({
   isUpdatingAsset,
   onApproveAsset,
   onRejectAsset,
-  onResubmitAsset,
   onWithdrawAsset,
   onDeleteDraftAsset,
 }: {
@@ -354,7 +378,6 @@ function AssetCard({
   isUpdatingAsset?: boolean;
   onApproveAsset?: (assetId: string) => void;
   onRejectAsset?: (assetId: string) => void;
-  onResubmitAsset?: (assetId: string) => void;
   onWithdrawAsset?: (assetId: string) => void;
   onDeleteDraftAsset?: (asset: Asset) => void;
 }) {
@@ -426,16 +449,6 @@ function AssetCard({
               className="rounded-lg border border-yellow-800 bg-yellow-950 px-3 py-2 text-xs text-yellow-200 hover:bg-yellow-900 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Withdraw Asset
-            </button>
-          )}
-
-          {asset.status === "Rejected" && onResubmitAsset && (
-            <button
-              onClick={() => onResubmitAsset(asset.id!)}
-              disabled={isUpdatingAsset}
-              className="rounded-lg border border-blue-800 bg-blue-950 px-3 py-2 text-xs text-blue-200 hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Resubmit Asset
             </button>
           )}
         </div>

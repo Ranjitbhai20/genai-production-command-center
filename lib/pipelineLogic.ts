@@ -13,11 +13,64 @@ const REQUIRED_PRODUCTION_STAGE_TITLES = [
   "Audio + Text",
 ];
 
+const ASSIGNMENT_KEY_TTL_HOURS = 24;
+
 export type FinalHandoffCheck = {
   approvedVisualStages: string[];
   missingStages: string[];
   canAttemptHandoff: boolean;
 };
+
+export function generateAssignmentKey() {
+  const randomValue =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, "").slice(0, 10)
+      : Math.random().toString(36).slice(2, 12);
+
+  return `WORKER-${randomValue.toUpperCase()}`;
+}
+
+function getAssignmentExpiry(createdAtIso: string) {
+  const expiresAt = new Date(createdAtIso);
+  expiresAt.setHours(expiresAt.getHours() + ASSIGNMENT_KEY_TTL_HOURS);
+  return expiresAt.toISOString();
+}
+
+export function isAssignmentExpired(stage: Stage) {
+  if (!stage.assignmentKeyExpiresAt) return false;
+  return new Date(stage.assignmentKeyExpiresAt).getTime() <= Date.now();
+}
+
+export function expireAssignmentIfNeeded(stage: Stage): Stage {
+  if (
+    stage.assignmentStatus === "active" &&
+    isAssignmentExpired(stage)
+  ) {
+    return {
+      ...stage,
+      assignmentStatus: "expired",
+      assignmentKey: undefined,
+      notes: "Assignment key expired after 24 hours.",
+    };
+  }
+
+  return stage;
+}
+
+export function autoExpireAssignments(stages: Stage[]) {
+  return stages.map(expireAssignmentIfNeeded);
+}
+
+function clearAssignmentFields(stage: Stage): Stage {
+  return {
+    ...stage,
+    assignmentKey: undefined,
+    assignmentKeyCreatedAt: undefined,
+    assignmentKeyExpiresAt: undefined,
+    assignmentActivatedAt: undefined,
+    assignmentSubmittedAt: undefined,
+  };
+}
 
 export function isStageBlocked(stages: Stage[], index: number) {
   const stage = stages[index];
@@ -31,9 +84,7 @@ export function isStageBlocked(stages: Stage[], index: number) {
     return !check.canAttemptHandoff;
   }
 
-  if (index >= 1 && !scriptApproved) {
-    return true;
-  }
+  if (index >= 1 && !scriptApproved) return true;
 
   return false;
 }
@@ -91,13 +142,18 @@ export function approveStage(
   return stages.map((stage, index) => {
     if (index === selectedStageIndex) {
       const feedback =
-        feedbackText.trim() || "Project owner approved the latest version.";
+        feedbackText.trim() ||
+        "Project owner approved the latest version.";
 
       const versions =
         stage.versions.length > 0
           ? stage.versions.map((version, versionIndex) =>
               versionIndex === stage.versions.length - 1
-                ? { ...version, status: "Approved" as const, feedback }
+                ? {
+                    ...version,
+                    status: "Approved" as const,
+                    feedback,
+                  }
                 : version
             )
           : [
@@ -105,27 +161,29 @@ export function approveStage(
                 label: "v1",
                 status: "Approved" as const,
                 feedback,
-                submittedBy: stage.assignedWorker || "Project Owner",
+                submittedBy: stage.owner,
               },
             ];
 
       return {
-        ...stage,
+        ...clearAssignmentFields(stage),
         status: "Approved" as const,
+        assignmentStatus: "approved" as const,
         versions,
+        notes: feedback,
       };
     }
 
     if (
       selectedStageIndex === 0 &&
       index >= 1 &&
-      (stage.status === "Locked" || stage.status === "Needs Revalidation")
+      (stage.status === "Locked" ||
+        stage.status === "Needs Revalidation")
     ) {
       return {
         ...stage,
         status: "Waiting" as const,
-        notes:
-          "Script is approved. Project owner can now assign, review, approve, revise, or continue this stage.",
+        notes: "Script approved. Production stages unlocked.",
       };
     }
 
@@ -133,49 +191,83 @@ export function approveStage(
   });
 }
 
-export function rejectLatestVersion(
+export function requestRevision(
   stages: Stage[],
   selectedStageIndex: number,
   feedbackText: string
 ) {
   const feedback =
-    feedbackText.trim() || "Project owner rejected this version. Revision needed.";
+    feedbackText.trim() ||
+    "Revision requested by project owner.";
 
   return stages.map((stage, index) => {
-    if (index === selectedStageIndex) {
-      const versions =
-        stage.versions.length > 0
-          ? stage.versions.map((version, versionIndex) =>
-              versionIndex === stage.versions.length - 1
-                ? { ...version, status: "Rejected" as const, feedback }
-                : version
-            )
-          : [
-              {
-                label: "v1",
-                status: "Rejected" as const,
-                feedback,
-                submittedBy: stage.assignedWorker || "Project Owner",
-              },
-            ];
+    if (index !== selectedStageIndex) return stage;
 
-      return {
-        ...stage,
-        status: "Rejected" as const,
-        versions,
-      };
-    }
+    const versions =
+      stage.versions.length > 0
+        ? stage.versions.map((version, versionIndex) =>
+            versionIndex === stage.versions.length - 1
+              ? {
+                  ...version,
+                  status: "Rejected" as const,
+                  feedback,
+                }
+              : version
+          )
+        : [
+            {
+              label: "v1",
+              status: "Rejected" as const,
+              feedback,
+              submittedBy: stage.owner,
+            },
+          ];
 
-    if (selectedStageIndex === 0 && index >= 1) {
-      return {
-        ...stage,
-        status: "Needs Revalidation" as const,
-        notes:
-          "Script changed or was rejected. Existing work is saved, but project owner must revalidate before continuing.",
-      };
-    }
+    return {
+      ...stage,
+      status: "Rejected" as const,
+      assignmentStatus: "rejected" as const,
+      versions,
+      notes: feedback,
+    };
+  });
+}
 
-    return stage;
+export function rejectAndTakeDirectorControl(
+  stages: Stage[],
+  selectedStageIndex: number,
+  feedbackText: string
+) {
+  const feedback =
+    feedbackText.trim() ||
+    "Worker submission rejected. Director has taken back control.";
+
+  return stages.map((stage, index) => {
+    if (index !== selectedStageIndex) return stage;
+
+    const versions =
+      stage.versions.length > 0
+        ? stage.versions.map((version, versionIndex) =>
+            versionIndex === stage.versions.length - 1
+              ? {
+                  ...version,
+                  status: "Rejected" as const,
+                  feedback,
+                }
+              : version
+          )
+        : [];
+
+    return {
+      ...clearAssignmentFields(stage),
+      owner: "Project Owner",
+      status: "Waiting" as const,
+      executionMode: "Director Controlled",
+      accessLevel: "Full control",
+      assignmentStatus: "rejected" as const,
+      versions,
+      notes: feedback,
+    };
   });
 }
 
@@ -198,43 +290,93 @@ export function submitNewVersion(
           label: `v${nextVersionNumber}`,
           status: "Submitted" as const,
           feedback:
-            feedbackText.trim() || "New version submitted for project owner review.",
-          submittedBy: stage.assignedWorker || "Project Owner",
+            feedbackText.trim() ||
+            "New version submitted for review.",
+          submittedBy: stage.owner,
         },
       ],
     };
   });
 }
 
-export function takeDirectorControl(stages: Stage[], selectedStageIndex: number) {
+export function submitAssignment(
+  stages: Stage[],
+  selectedStageIndex: number,
+  feedbackText: string
+) {
+  return stages.map((stage, index) => {
+    if (index !== selectedStageIndex) return stage;
+
+    const checkedStage = expireAssignmentIfNeeded(stage);
+
+    if (checkedStage.assignmentStatus === "expired") {
+      return checkedStage;
+    }
+
+    const nextVersionNumber = checkedStage.versions.length + 1;
+    const submittedAt = new Date().toISOString();
+
+    return {
+      ...checkedStage,
+      status: "Submitted" as const,
+      assignmentStatus: "submitted" as const,
+      assignmentSubmittedAt: submittedAt,
+      versions: [
+        ...checkedStage.versions,
+        {
+          label: `v${nextVersionNumber}`,
+          status: "Submitted" as const,
+          feedback:
+            feedbackText.trim() ||
+            "Worker assignment submitted for director review.",
+          submittedBy: "Worker",
+        },
+      ],
+      notes: "Worker assignment submitted for director review.",
+    };
+  });
+}
+
+export function takeDirectorControl(
+  stages: Stage[],
+  selectedStageIndex: number
+) {
   return stages.map((stage, index) =>
     index === selectedStageIndex
       ? {
-          ...stage,
+          ...clearAssignmentFields(stage),
           owner: "Project Owner",
-          executionMode: "Self-managed",
-          assignedWorker: "Not assigned",
+          executionMode: "Director Controlled",
           accessLevel: "Full control",
-          taskBrief:
-            "Project owner has taken control of this stage while preserving all previous worker submissions.",
+          assignmentStatus: "revoked" as const,
+          notes:
+            "Director has taken control while preserving worker history.",
         }
       : stage
   );
 }
 
-export function assignBackToWorker(stages: Stage[], selectedStageIndex: number) {
+export function assignBackToWorker(
+  stages: Stage[],
+  selectedStageIndex: number
+) {
+  const createdAt = new Date().toISOString();
+
   return stages.map((stage, index) =>
     index === selectedStageIndex
       ? {
           ...stage,
-          owner: stage.defaultWorker,
-          executionMode: "Assigned to worker",
-          assignedWorker: "Not assigned",
-          accessLevel:
-            stage.defaultWorker === "AI Operator"
-              ? "Upload + comment only"
-              : "Submit versions only",
-          taskBrief: `Ready to assign to ${stage.defaultWorker}. Worker can submit versions; project owner keeps approval authority.`,
+          owner: "Worker",
+          executionMode: "Assigned to Worker",
+          accessLevel: "Submit versions only",
+          assignmentKey: generateAssignmentKey(),
+          assignmentStatus: "active" as const,
+          assignmentKeyCreatedAt: createdAt,
+          assignmentKeyExpiresAt: getAssignmentExpiry(createdAt),
+          assignmentActivatedAt: undefined,
+          assignmentSubmittedAt: undefined,
+          notes:
+            "Stage assigned to worker. Assignment key generated and valid for 24 hours.",
         }
       : stage
   );

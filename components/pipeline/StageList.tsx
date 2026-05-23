@@ -33,6 +33,8 @@ export function StageList({
           const blocked = isStageBlocked(stages, index);
           const selected = selectedStageIndex === index;
           const approved = stage.status === "Approved";
+          const handledBy =
+            stage.owner === "Project Owner" ? "Project Owner" : "Worker";
 
           return (
             <div
@@ -70,7 +72,7 @@ export function StageList({
                     )}
                   </div>
 
-                  <div className="min-w-56 text-right">
+                  <div className="min-w-44 text-right">
                     <span
                       className={`mb-3 inline-block rounded-full border px-3 py-1 text-sm ${statusStyle(
                         stage.status
@@ -79,17 +81,9 @@ export function StageList({
                       {stage.status}
                     </span>
 
-                    <p className="text-sm text-zinc-500">Owner</p>
+                    <p className="text-sm text-zinc-500">Handled By</p>
 
-                    <p className="mb-2 font-semibold">
-                      {stage.owner || "Project Owner"}
-                    </p>
-
-                    <p className="text-sm text-zinc-500">Assigned Worker</p>
-
-                    <p className="font-semibold">
-                      {stage.assignedWorker || "Not assigned"}
-                    </p>
+                    <p className="font-semibold">{handledBy}</p>
                   </div>
                 </div>
               </button>

@@ -15,6 +15,11 @@ type ActiveAssignment = {
   stage: Stage;
 };
 
+function isExpired(expiresAt?: string) {
+  if (!expiresAt) return false;
+  return new Date(expiresAt).getTime() <= Date.now();
+}
+
 export function WorkerWorkspaceView({ projects }: { projects: Project[] }) {
   const [assets, setAssets] = useState<Asset[]>(
     projects.flatMap((project) => project.assets)
@@ -28,27 +33,35 @@ export function WorkerWorkspaceView({ projects }: { projects: Project[] }) {
     null
   );
 
-  const assignmentKeys = useMemo(() => {
+  const assignmentRegistry = useMemo(() => {
     return projects.flatMap((project) =>
       project.stages
-        .filter((stage) => project.id && stage.id)
+        .filter(
+          (stage) =>
+            project.id &&
+            stage.id &&
+            stage.assignmentKey &&
+            stage.assignmentStatus === "active"
+        )
         .map((stage) => ({
           project,
           stage,
           key: `${project.id}:${stage.id}`,
-          url: `/worker/${project.id}/${stage.id}`,
+          assignmentKey: stage.assignmentKey,
         }))
     );
   }, [projects]);
 
-  const activeAssignments: ActiveAssignment[] = assignmentKeys
+  const activeAssignments: ActiveAssignment[] = assignmentRegistry
     .filter((item) => {
       const activated = activatedStageKeys.includes(item.key);
 
       const stillEditable =
         item.stage.status !== "Submitted" &&
         item.stage.status !== "Approved" &&
-        item.stage.status !== "Rejected";
+        item.stage.status !== "Rejected" &&
+        item.stage.assignmentStatus === "active" &&
+        !isExpired(item.stage.assignmentKeyExpiresAt);
 
       return activated && stillEditable;
     })
@@ -86,38 +99,44 @@ export function WorkerWorkspaceView({ projects }: { projects: Project[] }) {
   }
 
   function normalizeAssignmentInput(value: string) {
-    const trimmed = value.trim();
-
-    if (!trimmed) return "";
-
-    if (trimmed.includes("/worker/")) {
-      const parts = trimmed.split("/worker/")[1]?.split("/").filter(Boolean);
-
-      if (parts?.[0] && parts?.[1]) {
-        return `${parts[0]}:${parts[1]}`;
-      }
-    }
-
-    return trimmed;
+    return value.trim().toUpperCase();
   }
 
-  function activateAssignment() {
+  async function activateAssignment() {
     const normalized = normalizeAssignmentInput(assignmentInput);
 
-    const match = assignmentKeys.find((item) => {
-      return (
-        normalized === item.key ||
-        normalized.endsWith(item.key) ||
-        normalized.endsWith(item.url)
-      );
-    });
+    const match = assignmentRegistry.find(
+    (item) => item.assignmentKey?.toUpperCase() === normalized
+);
 
     if (!match) {
-      window.alert(
-        "Assignment link/key not recognized. Use projectId:stageId or a /worker/projectId/stageId link."
-      );
+      window.alert("Assignment key not recognized.");
       return;
     }
+
+    if (isExpired(match.stage.assignmentKeyExpiresAt)) {
+      await supabase
+        .from("stages")
+        .update({
+          assignment_key: null,
+          assignment_status: "expired",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", match.stage.id);
+
+      window.alert("Assignment key expired.");
+      window.location.reload();
+      return;
+    }
+
+    await supabase
+      .from("stages")
+      .update({
+        assignment_activated_at:
+          match.stage.assignmentActivatedAt ?? new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", match.stage.id);
 
     setActivatedStageKeys((current) => {
       if (current.includes(match.key)) return current;
@@ -129,6 +148,11 @@ export function WorkerWorkspaceView({ projects }: { projects: Project[] }) {
 
   async function handleUpload(project: Project, stage: Stage, file: File) {
     if (!project.id || !stage.id) return;
+
+    if (isExpired(stage.assignmentKeyExpiresAt)) {
+      window.alert("Assignment key expired. Ask the director for a new key.");
+      return;
+    }
 
     const stageKey = `${project.id}:${stage.id}`;
 
@@ -158,6 +182,11 @@ export function WorkerWorkspaceView({ projects }: { projects: Project[] }) {
 
   async function handleSubmit(project: Project, stage: Stage) {
     if (!project.id || !stage.id) return;
+
+    if (isExpired(stage.assignmentKeyExpiresAt)) {
+      window.alert("Assignment key expired. Ask the director for a new key.");
+      return;
+    }
 
     const stageKey = `${project.id}:${stage.id}`;
 
@@ -191,6 +220,8 @@ export function WorkerWorkspaceView({ projects }: { projects: Project[] }) {
       .from("stages")
       .update({
         status: "Submitted",
+        assignment_status: "submitted",
+        assignment_submitted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", stage.id);
@@ -208,25 +239,24 @@ export function WorkerWorkspaceView({ projects }: { projects: Project[] }) {
         <h1 className="text-4xl font-bold">Assignments & Work History</h1>
 
         <p className="mt-3 max-w-3xl text-zinc-400">
-          Global worker dashboard across all productions. Paste an assignment
-          link to activate pending work. Submitted work becomes read-only
-          history.
+          Paste a valid 24-hour assignment key to activate pending work.
+          Submitted work becomes read-only history.
         </p>
       </div>
 
       <section className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950 p-6">
-        <h2 className="mb-2 text-2xl font-semibold">Enter Assignment Link</h2>
+        <h2 className="mb-2 text-2xl font-semibold">Enter Assignment Key</h2>
 
         <p className="mb-4 text-sm text-zinc-500">
-          Prototype format: projectId:stageId or /worker/projectId/stageId.
-          Later this becomes a secure 24-hour token login link.
+          Assignment keys are generated by the director and expire after 24
+          hours.
         </p>
 
         <div className="grid grid-cols-[minmax(0,1fr)_180px] gap-3">
           <input
             value={assignmentInput}
             onChange={(event) => setAssignmentInput(event.target.value)}
-            placeholder="Paste assignment link or key..."
+            placeholder="Paste assignment key..."
             className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-white outline-none focus:border-zinc-500"
           />
 
@@ -364,6 +394,13 @@ function ActiveAssignmentCard({
           <h3 className="text-2xl font-bold">{stage.title}</h3>
 
           <p className="mt-2 max-w-3xl text-zinc-400">{stage.taskBrief}</p>
+
+          {stage.assignmentKeyExpiresAt && (
+            <p className="mt-2 text-xs text-zinc-600">
+              Key expires:{" "}
+              {new Date(stage.assignmentKeyExpiresAt).toLocaleString()}
+            </p>
+          )}
         </div>
 
         <span
