@@ -39,6 +39,8 @@ export function StageDetailPanel({
   onWithdrawAsset?: (assetId: string) => void;
   onDeleteDraftAsset?: (asset: Asset) => void;
 }) {
+  void onSubmitNewVersion;
+
   const selectedStage = stages[selectedStageIndex];
 
   if (!selectedStage) {
@@ -50,25 +52,25 @@ export function StageDetailPanel({
   }
 
   const selectedStageBlocked = isStageBlocked(stages, selectedStageIndex);
+  const selectedStageApproved = selectedStage.status === "Approved";
+  const projectComplete = projectStatus === "complete";
 
-  const selectedStageApproved =
-    selectedStage.status === "Approved";
+  const directorControlled =
+    !selectedStage.assignedWorker ||
+    selectedStage.assignedWorker === "Not assigned";
 
-  const projectComplete =
-    projectStatus === "complete";
+  const stageLocked =
+    selectedStageBlocked || selectedStageApproved || projectComplete;
 
-  const stageReadOnly =
-    selectedStageBlocked ||
-    selectedStageApproved ||
-    projectComplete;
+  const canApproveStage = !stageLocked;
+  const canRequestRevision = !stageLocked && !directorControlled;
+  const canUploadAsset = !stageLocked && Boolean(onUploadAsset);
 
   const linkedAssets = assets.filter(
     (asset) => asset.linkedStage === selectedStage.title
   );
 
-  const draftAssets = linkedAssets.filter(
-    (asset) => asset.status === "Draft"
-  );
+  const draftAssets = linkedAssets.filter((asset) => asset.status === "Draft");
 
   const submittedAssets = linkedAssets.filter(
     (asset) => asset.status === "Submitted"
@@ -85,29 +87,22 @@ export function StageDetailPanel({
     (asset) => asset.status === "Removed"
   );
 
-  function handleAssetUpload(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
+  function handleAssetUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
     if (!file || !onUploadAsset) return;
 
     onUploadAsset(file);
-
     event.target.value = "";
   }
 
   return (
-    <aside className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+    <aside className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-6 pb-40">
       <div className="mb-6">
-        <p className="mb-2 text-sm text-zinc-500">
-          Director Review Panel
-        </p>
+        <p className="mb-2 text-sm text-zinc-500">Director Review Panel</p>
 
         <div className="mb-4 flex items-start justify-between gap-4">
-          <h3 className="text-2xl font-bold">
-            {selectedStage.title}
-          </h3>
+          <h3 className="text-2xl font-bold">{selectedStage.title}</h3>
 
           <span
             className={`shrink-0 rounded-full border px-3 py-1 text-sm ${statusStyle(
@@ -119,9 +114,7 @@ export function StageDetailPanel({
         </div>
 
         {projectComplete && (
-          <Notice tone="neutral">
-            Production is archived and read-only.
-          </Notice>
+          <Notice tone="neutral">Production is archived and read-only.</Notice>
         )}
 
         {!projectComplete && selectedStageBlocked && (
@@ -131,49 +124,34 @@ export function StageDetailPanel({
         )}
 
         {!projectComplete && selectedStageApproved && (
-          <Notice tone="success">
-            This stage is approved and locked.
+          <Notice tone="success">This stage is approved and locked.</Notice>
+        )}
+
+        {!stageLocked && directorControlled && (
+          <Notice tone="neutral">
+            Director-controlled stage. You can approve it directly. Revision
+            requests are disabled unless this stage is assigned to a worker.
           </Notice>
         )}
       </div>
 
       <div className="mb-6 rounded-2xl border border-zinc-800 bg-black/30 p-4">
-        <p className="mb-3 text-sm text-zinc-500">
-          Responsibility
-        </p>
+        <p className="mb-3 text-sm text-zinc-500">Responsibility</p>
 
         <div className="space-y-3 text-sm">
-          <InfoRow
-            label="Owner"
-            value={selectedStage.owner}
-          />
+          <InfoRow label="Owner" value={selectedStage.owner} />
 
           <InfoRow
             label="Assigned Worker"
             value={selectedStage.assignedWorker}
           />
 
-          <InfoRow
-            label="Default Worker"
-            value={selectedStage.defaultWorker}
-          />
-
-          <InfoRow
-            label="Approval Authority"
-            value={selectedStage.approvalAuthority}
-          />
-
-          <InfoRow
-            label="Access Level"
-            value={selectedStage.accessLevel}
-          />
+          <InfoRow label="Access Level" value={selectedStage.accessLevel} />
         </div>
       </div>
 
       <div className="mb-6">
-        <p className="mb-2 text-sm text-zinc-500">
-          Task Brief
-        </p>
+        <p className="mb-2 text-sm text-zinc-500">Task Brief</p>
 
         <p className="leading-relaxed text-zinc-300">
           {selectedStage.taskBrief}
@@ -182,9 +160,7 @@ export function StageDetailPanel({
 
       {selectedStage.notes && (
         <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-          <p className="mb-2 text-sm text-zinc-500">
-            Latest Decision Note
-          </p>
+          <p className="mb-2 text-sm text-zinc-500">Latest Decision Note</p>
 
           <p className="text-sm leading-relaxed text-zinc-300">
             {selectedStage.notes}
@@ -193,49 +169,35 @@ export function StageDetailPanel({
       )}
 
       <div className="mb-6 rounded-2xl border border-zinc-800 bg-black/30 p-4">
-        <p className="mb-2 text-sm text-zinc-500">
-          Production Note
-        </p>
+        <p className="mb-2 text-sm text-zinc-500">Production Note</p>
 
         <textarea
           value={feedbackText}
-          onChange={(event) =>
-            onFeedbackChange(event.target.value)
-          }
-          disabled={stageReadOnly}
+          onChange={(event) => onFeedbackChange(event.target.value)}
+          disabled={stageLocked}
           placeholder={
             projectComplete
               ? "Production archived."
-              : stageReadOnly
-              ? "Stage locked."
-              : "Add review notes or revision context..."
+              : stageLocked
+                ? "Stage locked."
+                : "Add review notes or approval context..."
           }
           className="min-h-24 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white outline-none focus:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
         />
 
         <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-          Optional for approval. Recommended for revision
-          tracking and production memory.
+          Optional for approval. Recommended for review tracking and production
+          memory.
         </p>
       </div>
 
       <div className="mb-6 rounded-2xl border border-zinc-800 bg-black/30 p-4">
-        <p className="mb-3 text-sm text-zinc-500">
-          Stage Actions
-        </p>
+        <p className="mb-3 text-sm text-zinc-500">Director Review Actions</p>
 
         <div className="grid grid-cols-1 gap-3">
           <button
-            onClick={onSubmitNewVersion}
-            disabled={stageReadOnly}
-            className="rounded-xl border border-purple-800 bg-purple-950 p-3 text-purple-200 hover:bg-purple-900 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Submit Version
-          </button>
-
-          <button
             onClick={onApproveStage}
-            disabled={stageReadOnly}
+            disabled={!canApproveStage}
             className="rounded-xl border border-green-800 bg-green-950 p-3 text-green-200 hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Approve Stage
@@ -243,19 +205,23 @@ export function StageDetailPanel({
 
           <button
             onClick={onRejectLatestVersion}
-            disabled={stageReadOnly}
+            disabled={!canRequestRevision}
             className="rounded-xl border border-red-800 bg-red-950 p-3 text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Request Revision
           </button>
         </div>
+
+        {directorControlled && (
+          <p className="mt-3 text-xs text-zinc-500">
+            Revision requests are only active when a worker submission exists.
+          </p>
+        )}
       </div>
 
       <div className="border-t border-zinc-800 pt-5">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm text-zinc-500">
-            Assets
-          </p>
+          <p className="text-sm text-zinc-500">Assets</p>
 
           <span className="text-xs text-zinc-600">
             {linkedAssets.length} linked
@@ -265,21 +231,17 @@ export function StageDetailPanel({
         {onUploadAsset && (
           <label
             className={`mb-4 flex cursor-pointer items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-200 hover:bg-zinc-800 ${
-              stageReadOnly || isUploadingAsset
+              !canUploadAsset || isUploadingAsset
                 ? "pointer-events-none cursor-not-allowed opacity-40"
                 : ""
             }`}
           >
-            {isUploadingAsset
-              ? "Uploading..."
-              : "Upload Draft Asset"}
+            {isUploadingAsset ? "Uploading..." : "Upload Draft Asset"}
 
             <input
               type="file"
               className="hidden"
-              disabled={
-                stageReadOnly || isUploadingAsset
-              }
+              disabled={!canUploadAsset || isUploadingAsset}
               onChange={handleAssetUpload}
             />
           </label>
@@ -334,17 +296,23 @@ function AssetSection({
   onResubmitAsset,
   onWithdrawAsset,
   onDeleteDraftAsset,
-}: any) {
+}: {
+  title: string;
+  emptyText: string;
+  assets: Asset[];
+  isUpdatingAsset?: boolean;
+  onApproveAsset?: (assetId: string) => void;
+  onRejectAsset?: (assetId: string) => void;
+  onResubmitAsset?: (assetId: string) => void;
+  onWithdrawAsset?: (assetId: string) => void;
+  onDeleteDraftAsset?: (asset: Asset) => void;
+}) {
   return (
     <div className="mb-5">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-sm font-medium text-zinc-300">
-          {title}
-        </p>
+        <p className="text-sm font-medium text-zinc-300">{title}</p>
 
-        <span className="text-xs text-zinc-600">
-          {assets.length}
-        </span>
+        <span className="text-xs text-zinc-600">{assets.length}</span>
       </div>
 
       {assets.length === 0 && (
@@ -355,7 +323,7 @@ function AssetSection({
 
       {assets.length > 0 && (
         <div className="space-y-3">
-          {assets.map((asset: Asset) => (
+          {assets.map((asset) => (
             <AssetCard
               key={asset.id ?? asset.name}
               asset={asset}
@@ -381,16 +349,22 @@ function AssetCard({
   onResubmitAsset,
   onWithdrawAsset,
   onDeleteDraftAsset,
-}: any) {
+}: {
+  asset: Asset;
+  isUpdatingAsset?: boolean;
+  onApproveAsset?: (assetId: string) => void;
+  onRejectAsset?: (assetId: string) => void;
+  onResubmitAsset?: (assetId: string) => void;
+  onWithdrawAsset?: (assetId: string) => void;
+  onDeleteDraftAsset?: (asset: Asset) => void;
+}) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-medium">{asset.name}</p>
 
-          <p className="mt-1 text-xs text-zinc-500">
-            {asset.type}
-          </p>
+          <p className="mt-1 text-xs text-zinc-500">{asset.type}</p>
         </div>
 
         <span
@@ -415,57 +389,62 @@ function AssetCard({
 
       {asset.id && (
         <div className="mt-3 grid grid-cols-1 gap-2">
-          {asset.status === "Draft" &&
-            onDeleteDraftAsset && (
-              <button
-                onClick={() =>
-                  onDeleteDraftAsset(asset)
-                }
-                disabled={isUpdatingAsset}
-                className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Delete Draft Upload
-              </button>
-            )}
+          {asset.status === "Draft" && onDeleteDraftAsset && (
+            <button
+              onClick={() => onDeleteDraftAsset(asset)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Delete Draft Upload
+            </button>
+          )}
 
-          {asset.status === "Submitted" &&
-            onApproveAsset && (
-              <button
-                onClick={() =>
-                  onApproveAsset(asset.id!)
-                }
-                disabled={isUpdatingAsset}
-                className="rounded-lg border border-green-800 bg-green-950 px-3 py-2 text-xs text-green-200 hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Approve Asset
-              </button>
-            )}
+          {asset.status === "Submitted" && onApproveAsset && (
+            <button
+              onClick={() => onApproveAsset(asset.id!)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-green-800 bg-green-950 px-3 py-2 text-xs text-green-200 hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Approve Asset
+            </button>
+          )}
 
-          {asset.status === "Submitted" &&
-            onRejectAsset && (
-              <button
-                onClick={() =>
-                  onRejectAsset(asset.id!)
-                }
-                disabled={isUpdatingAsset}
-                className="rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-xs text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Reject Asset
-              </button>
-            )}
+          {asset.status === "Submitted" && onRejectAsset && (
+            <button
+              onClick={() => onRejectAsset(asset.id!)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-xs text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Reject Asset
+            </button>
+          )}
+
+          {asset.status === "Submitted" && onWithdrawAsset && (
+            <button
+              onClick={() => onWithdrawAsset(asset.id!)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-yellow-800 bg-yellow-950 px-3 py-2 text-xs text-yellow-200 hover:bg-yellow-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Withdraw Asset
+            </button>
+          )}
+
+          {asset.status === "Rejected" && onResubmitAsset && (
+            <button
+              onClick={() => onResubmitAsset(asset.id!)}
+              disabled={isUpdatingAsset}
+              className="rounded-lg border border-blue-800 bg-blue-950 px-3 py-2 text-xs text-blue-200 hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Resubmit Asset
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4">
       <span className="text-zinc-500">{label}</span>
@@ -485,20 +464,13 @@ function Notice({
   tone: "neutral" | "warning" | "success";
 }) {
   const classes = {
-    neutral:
-      "border-zinc-700 bg-zinc-900 text-zinc-300",
-
-    warning:
-      "border-yellow-800 bg-yellow-950 text-yellow-200",
-
-    success:
-      "border-green-800 bg-green-950 text-green-200",
+    neutral: "border-zinc-700 bg-zinc-900 text-zinc-300",
+    warning: "border-yellow-800 bg-yellow-950 text-yellow-200",
+    success: "border-green-800 bg-green-950 text-green-200",
   };
 
   return (
-    <div
-      className={`mb-5 rounded-xl border p-4 text-sm ${classes[tone]}`}
-    >
+    <div className={`mb-5 rounded-xl border p-4 text-sm ${classes[tone]}`}>
       {children}
     </div>
   );

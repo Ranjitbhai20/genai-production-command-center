@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import type { GlobalView } from "@/types/pipeline";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { DataViewButton } from "@/components/layout/DataViewButton";
 import { BriefView } from "@/components/brief/BriefView";
@@ -13,6 +15,9 @@ import { getFinalHandoffCheck } from "@/lib/pipelineLogic";
 import { useProductionProjects } from "@/hooks/useProductionProjects";
 
 export default function Home() {
+  const [globalView, setGlobalView] =
+    useState<GlobalView>("director");
+
   const {
     projects,
     project,
@@ -48,7 +53,12 @@ export default function Home() {
     switchProject,
   } = useProductionProjects();
 
-  const finalHandoffCheck = getFinalHandoffCheck(stages);
+  const finalHandoffCheck =
+    getFinalHandoffCheck(stages);
+
+  function openWorkerWorkspace() {
+    setGlobalView("worker");
+  }
 
   function renderProjectTab() {
     if (!project) return null;
@@ -57,7 +67,7 @@ export default function Home() {
       return (
         <BriefView
           project={project}
-          onSaveBrief={(brief) => saveBrief(brief)}
+          onSaveBrief={saveBrief}
           onApproveBrief={approveBrief}
         />
       );
@@ -66,7 +76,8 @@ export default function Home() {
     if (project.status === "draft") {
       return (
         <div className="rounded-2xl border border-yellow-900 bg-yellow-950/30 p-6 text-yellow-200">
-          Production pipeline is locked until the concept brief is approved.
+          Production pipeline is locked until
+          the concept brief is approved.
         </div>
       );
     }
@@ -83,23 +94,37 @@ export default function Home() {
           isUpdatingAsset={isUpdatingAsset}
           onSelectStage={setSelectedStageIndex}
           onFeedbackChange={setFeedbackText}
-          onTakeDirectorControl={takeDirectorControl}
-          onAssignBackToWorker={assignBackToWorker}
-          onSubmitNewVersion={submitNewVersion}
+          onTakeDirectorControl={
+            takeDirectorControl
+          }
+          onAssignBackToWorker={
+            assignBackToWorker
+          }
+          onSubmitNewVersion={
+            submitNewVersion
+          }
           onApproveStage={approveStage}
-          onRejectLatestVersion={rejectLatestVersion}
+          onRejectLatestVersion={
+            rejectLatestVersion
+          }
           onUploadAsset={uploadAsset}
-          onApproveAsset={approveSelectedAsset}
-          onRejectAsset={rejectSelectedAsset}
-          onResubmitAsset={resubmitSelectedAsset}
-          onWithdrawAsset={withdrawSelectedAsset}
-          onDeleteDraftAsset={deleteSelectedDraftAsset}
+          onApproveAsset={
+            approveSelectedAsset
+          }
+          onRejectAsset={
+            rejectSelectedAsset
+          }
+          onResubmitAsset={
+            resubmitSelectedAsset
+          }
+          onWithdrawAsset={
+            withdrawSelectedAsset
+          }
+          onDeleteDraftAsset={
+            deleteSelectedDraftAsset
+          }
         />
       );
-    }
-
-    if (activeProjectTab === "worker") {
-      return <WorkerWorkspaceView project={project} />;
     }
 
     if (activeProjectTab === "assets") {
@@ -107,7 +132,12 @@ export default function Home() {
     }
 
     if (activeProjectTab === "approvals") {
-      return <ApprovalsView project={project} onOpenStage={openStage} />;
+      return (
+        <ApprovalsView
+          project={project}
+          onOpenStage={openStage}
+        />
+      );
     }
 
     if (activeProjectTab === "handoff") {
@@ -118,7 +148,40 @@ export default function Home() {
   }
 
   if (isLoadingProjects) {
-    return <main className="p-6 text-white">Loading productions...</main>;
+    return (
+      <main className="p-6 text-white">
+        Loading productions...
+      </main>
+    );
+  }
+
+  if (globalView === "worker") {
+    return (
+      <main className="min-h-screen bg-black p-6 text-white">
+        <button
+          onClick={() =>
+            setGlobalView("director")
+          }
+          className="mb-6 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+        >
+          Main Dashboard
+        </button>
+
+        <WorkerWorkspaceView
+          projects={projects}
+        />
+
+        <FloatingWorkspaceButtons
+          onOpenWorkerWorkspace={
+            openWorkerWorkspace
+          }
+        />
+
+        <DataViewButton
+          projects={projects}
+        />
+      </main>
+    );
   }
 
   if (!project) {
@@ -135,9 +198,12 @@ export default function Home() {
             </h1>
 
             <p className="mx-auto mb-8 max-w-xl text-zinc-400">
-              Start a new production brief to initialize the project database,
-              define creative direction, unlock the workflow pipeline, and
-              preserve the final handoff as searchable production memory.
+              Start a new production brief to
+              initialize the project database,
+              define creative direction,
+              unlock the workflow pipeline,
+              and preserve the final handoff
+              as searchable production memory.
             </p>
 
             <button
@@ -149,7 +215,15 @@ export default function Home() {
           </div>
         </div>
 
-        <DataViewButton projects={projects} />
+        <FloatingWorkspaceButtons
+          onOpenWorkerWorkspace={
+            openWorkerWorkspace
+          }
+        />
+
+        <DataViewButton
+          projects={projects}
+        />
       </main>
     );
   }
@@ -158,26 +232,61 @@ export default function Home() {
     <main className="flex min-h-screen bg-black text-white">
       <Sidebar
         projects={projects}
-        selectedProjectIndex={selectedProjectIndex}
-        activeProjectTab={activeProjectTab}
+        selectedProjectIndex={
+          selectedProjectIndex
+        }
+        activeProjectTab={
+          activeProjectTab
+        }
         onSwitchProject={switchProject}
         onSetTab={setActiveProjectTab}
-        onCreateProject={createNewProject}
+        onCreateProject={
+          createNewProject
+        }
       />
 
       <section className="flex-1 p-6">
         {renderProjectTab()}
       </section>
 
-      <DataViewButton projects={projects} />
+      <FloatingWorkspaceButtons
+        onOpenWorkerWorkspace={
+          openWorkerWorkspace
+        }
+      />
+
+      <DataViewButton
+        projects={projects}
+      />
 
       {showFinalHandoffModal && (
         <FinalHandoffConfirmModal
           check={finalHandoffCheck}
-          onCancel={() => setShowFinalHandoffModal(false)}
-          onConfirm={confirmFinalHandoffApproval}
+          onCancel={() =>
+            setShowFinalHandoffModal(false)
+          }
+          onConfirm={
+            confirmFinalHandoffApproval
+          }
         />
       )}
     </main>
+  );
+}
+
+function FloatingWorkspaceButtons({
+  onOpenWorkerWorkspace,
+}: {
+  onOpenWorkerWorkspace: () => void;
+}) {
+  return (
+    <div className="fixed bottom-6 left-6 z-50 flex flex-col gap-3">
+      <button
+        onClick={onOpenWorkerWorkspace}
+        className="rounded-full border border-blue-800 bg-blue-950 px-5 py-3 text-sm text-blue-200 shadow-xl hover:bg-blue-900"
+      >
+        Worker Workspace
+      </button>
+    </div>
   );
 }

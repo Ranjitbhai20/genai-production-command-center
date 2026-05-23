@@ -7,6 +7,7 @@ type SidebarProps = {
   onSwitchProject: (index: number) => void;
   onSetTab: (tab: ProjectTab) => void;
   onCreateProject: () => void;
+  onDeleteProject?: (index: number) => void;
 };
 
 export function Sidebar({
@@ -16,6 +17,7 @@ export function Sidebar({
   onSwitchProject,
   onSetTab,
   onCreateProject,
+  onDeleteProject,
 }: SidebarProps) {
   const project =
     selectedProjectIndex >= 0 && selectedProjectIndex < projects.length
@@ -23,6 +25,16 @@ export function Sidebar({
       : null;
 
   const productionUnlocked = project?.status !== "draft";
+
+  function handleDeleteProject(index: number, title: string) {
+    const confirmed = window.confirm(
+      `Delete "${title}"?\n\nThis removes the production and its linked production data from the dashboard.`
+    );
+
+    if (!confirmed) return;
+
+    onDeleteProject?.(index);
+  }
 
   return (
     <aside className="w-80 border-r border-zinc-800 bg-black p-6">
@@ -50,39 +62,55 @@ export function Sidebar({
             const selected = selectedProjectIndex === index;
 
             return (
-              <button
+              <div
                 key={item.id ?? `${item.title}-${index}`}
-                onClick={() => onSwitchProject(index)}
-                className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                className={`rounded-2xl border px-4 py-4 transition ${
                   selected
                     ? "border-zinc-700 bg-zinc-900 text-white"
                     : "border-transparent text-zinc-400 hover:bg-zinc-900"
                 }`}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-semibold">{item.title}</p>
+                <button
+                  onClick={() => onSwitchProject(index)}
+                  className="w-full text-left"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{item.title}</p>
 
-                    <p className="mt-1 text-xs text-zinc-500">
-                      {item.status === "draft"
-                        ? "Brief draft"
-                        : item.description || "Production initialized"}
-                    </p>
+                      <p className="mt-1 line-clamp-2 text-xs text-zinc-500">
+                        {item.status === "draft"
+                          ? "Brief draft"
+                          : item.description || "Production initialized"}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-1 text-[10px] uppercase tracking-wide ${
+                        item.status === "complete"
+                          ? "border-green-800 bg-green-950 text-green-200"
+                          : item.status === "in_production"
+                            ? "border-blue-800 bg-blue-950 text-blue-200"
+                            : "border-yellow-800 bg-yellow-950 text-yellow-200"
+                      }`}
+                    >
+                      {item.status.replace("_", " ")}
+                    </span>
                   </div>
+                </button>
 
-                  <span
-                    className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-wide ${
-                      item.status === "complete"
-                        ? "border-green-800 bg-green-950 text-green-200"
-                        : item.status === "in_production"
-                        ? "border-blue-800 bg-blue-950 text-blue-200"
-                        : "border-yellow-800 bg-yellow-950 text-yellow-200"
-                    }`}
+                {selected && onDeleteProject && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleDeleteProject(index, item.title);
+                    }}
+                    className="mt-4 w-full rounded-xl border border-red-900 bg-red-950/50 px-3 py-2 text-xs font-medium text-red-300 transition hover:bg-red-950 hover:text-red-100"
                   >
-                    {item.status.replace("_", " ")}
-                  </span>
-                </div>
-              </button>
+                    Delete Production
+                  </button>
+                )}
+              </div>
             );
           })}
 

@@ -11,21 +11,20 @@ export function stageFromRow(row: any): Stage {
     id: row.id,
 
     title: row.title,
-    owner: row.owner,
-    defaultWorker: row.default_worker,
-    approvalAuthority: row.approval_authority,
+    owner: row.owner ?? "Project Owner",
+    defaultWorker: row.default_worker ?? "",
 
     status: row.status,
 
-    tool: row.tool,
-    method: row.method,
-    executionMode: row.execution_mode,
+    tool: row.tool ?? "",
+    method: row.method ?? "",
+    executionMode: row.execution_mode ?? "",
 
-    assignedWorker: row.assigned_worker,
-    accessLevel: row.access_level,
+    assignedWorker: row.assigned_worker ?? "Not assigned",
+    accessLevel: row.access_level ?? "Full control",
 
-    taskBrief: row.task_brief,
-    description: row.description,
+    taskBrief: row.task_brief ?? "",
+    description: row.description ?? "",
 
     notes: row.notes ?? "",
 
@@ -42,21 +41,25 @@ export function stageToRow(stage: Stage, projectId: string, position: number) {
     position,
 
     title: stage.title,
-    owner: stage.owner,
-    default_worker: stage.defaultWorker,
-    approval_authority: stage.approvalAuthority,
+    owner: stage.owner ?? "Project Owner",
+    default_worker: stage.defaultWorker ?? "",
+
+    // Database compatibility only.
+    // The frontend no longer uses approvalAuthority,
+    // but Supabase still requires approval_authority as NOT NULL.
+    approval_authority: "Project Owner",
 
     status: stage.status,
 
-    tool: stage.tool,
-    method: stage.method,
-    execution_mode: stage.executionMode,
+    tool: stage.tool ?? "",
+    method: stage.method ?? "",
+    execution_mode: stage.executionMode ?? "",
 
-    assigned_worker: stage.assignedWorker,
-    access_level: stage.accessLevel,
+    assigned_worker: stage.assignedWorker ?? "Not assigned",
+    access_level: stage.accessLevel ?? "Full control",
 
-    task_brief: stage.taskBrief,
-    description: stage.description,
+    task_brief: stage.taskBrief ?? "",
+    description: stage.description ?? "",
 
     notes: stage.notes ?? "",
 
@@ -64,6 +67,10 @@ export function stageToRow(stage: Stage, projectId: string, position: number) {
 
     updated_at: new Date().toISOString(),
   };
+}
+
+function logSupabaseError(label: string, error: unknown) {
+  console.error(label, JSON.stringify(error, null, 2));
 }
 
 export async function loadStagesForProject(
@@ -77,7 +84,7 @@ export async function loadStagesForProject(
     .order("position", { ascending: true });
 
   if (error) {
-    console.error("Failed to load stages:", error);
+    logSupabaseError("Failed to load stages:", error);
     return [];
   }
 
@@ -85,7 +92,6 @@ export async function loadStagesForProject(
 
   if (projectStatus !== "draft" && stages.length === 0) {
     const defaultStages = makeProductionStages();
-
     const saved = await saveStagesForProject(projectId, defaultStages);
 
     if (!saved) {
@@ -99,7 +105,7 @@ export async function loadStagesForProject(
       .order("position", { ascending: true });
 
     if (backfillLoadError) {
-      console.error("Failed to reload backfilled stages:", backfillLoadError);
+      logSupabaseError("Failed to reload backfilled stages:", backfillLoadError);
       return defaultStages;
     }
 
@@ -110,13 +116,16 @@ export async function loadStagesForProject(
 }
 
 export async function saveStagesForProject(projectId: string, stages: Stage[]) {
-  const { error } = await supabase.from("stages").upsert(
-    stages.map((stage, index) => stageToRow(stage, projectId, index)),
-    { onConflict: "project_id,position" }
+  const rows = stages.map((stage, index) =>
+    stageToRow(stage, projectId, index)
   );
 
+  const { error } = await supabase
+    .from("stages")
+    .upsert(rows, { onConflict: "project_id,position" });
+
   if (error) {
-    console.error("Failed to save stages:", error);
+    logSupabaseError("Failed to save stages:", error);
     return false;
   }
 

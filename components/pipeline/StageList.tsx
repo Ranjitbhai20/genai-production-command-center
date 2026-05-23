@@ -63,10 +63,6 @@ export function StageList({
                       Method: {stage.method}
                     </p>
 
-                    <p className="mt-1 text-sm text-zinc-500">
-                      Tool: {stage.tool}
-                    </p>
-
                     {blocked && (
                       <p className="mt-3 text-sm text-yellow-300">
                         {blockedReason(stages, index)}
@@ -84,15 +80,16 @@ export function StageList({
                     </span>
 
                     <p className="text-sm text-zinc-500">Owner</p>
-                    <p className="mb-2 font-semibold">{stage.owner}</p>
 
-                    <p className="text-sm text-zinc-500">Assigned Worker</p>
                     <p className="mb-2 font-semibold">
-                      {stage.assignedWorker || "Not assigned"}
+                      {stage.owner || "Project Owner"}
                     </p>
 
-                    <p className="text-sm text-zinc-500">Approval</p>
-                    <p className="font-semibold">{stage.approvalAuthority}</p>
+                    <p className="text-sm text-zinc-500">Assigned Worker</p>
+
+                    <p className="font-semibold">
+                      {stage.assignedWorker || "Not assigned"}
+                    </p>
                   </div>
                 </div>
               </button>

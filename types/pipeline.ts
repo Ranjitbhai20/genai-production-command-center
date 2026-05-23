@@ -12,12 +12,16 @@ export type StageStatus =
 export type ProjectTab =
   | "brief"
   | "pipeline"
-  | "worker"
   | "assets"
   | "approvals"
   | "handoff";
 
-export type ProjectStatus = "draft" | "in_production" | "complete";
+export type GlobalView = "director" | "worker";
+
+export type ProjectStatus =
+  | "draft"
+  | "in_production"
+  | "complete";
 
 export type ProjectType =
   | "Advertisement"
@@ -30,7 +34,12 @@ export type ProjectType =
   | "Hybrid Live Action"
   | "Other";
 
-export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "Other";
+export type AspectRatio =
+  | "9:16"
+  | "16:9"
+  | "1:1"
+  | "4:5"
+  | "Other";
 
 export type RuntimeTarget =
   | "<10 sec"
@@ -67,9 +76,9 @@ export type Stage = {
   id?: string;
 
   title: string;
+
   owner: string;
   defaultWorker: string;
-  approvalAuthority: string;
 
   status: StageStatus;
 
@@ -119,12 +128,19 @@ export type Asset = {
 
 export type ProjectBriefInput = {
   ownerName: string;
+
   projectType: ProjectType;
+
   aspectRatio: AspectRatio;
+
   runtimeTarget: RuntimeTarget;
+
   workflowMode: WorkflowMode;
+
   visualStyle: VisualStyle;
+
   conceptSummary: string;
+
   additionalInfo: string;
 };
 
@@ -133,18 +149,26 @@ export type Project = {
 
   title: string;
   description: string;
+
   status: ProjectStatus;
 
   ownerName: string;
+
   projectType: ProjectType;
+
   aspectRatio: AspectRatio;
+
   runtimeTarget: RuntimeTarget;
+
   workflowMode: WorkflowMode;
+
   visualStyle: VisualStyle;
 
   conceptSummary: string;
+
   additionalInfo: string;
 
   stages: Stage[];
+
   assets: Asset[];
 };

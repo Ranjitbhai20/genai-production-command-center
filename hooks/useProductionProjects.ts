@@ -222,29 +222,47 @@ export function useProductionProjects() {
     );
   }
 
-  async function deleteCurrentProject() {
-    if (!project?.id) return;
+  async function deleteProject(index: number) {
+    const targetProject = projects[index];
 
-    const confirmed = window.confirm(
-      `Delete "${project.title}"? This cannot be undone.`
-    );
-
-    if (!confirmed) return;
+    if (!targetProject?.id) return;
 
     const { error } = await supabase
       .from("projects")
       .delete()
-      .eq("id", project.id);
+      .eq("id", targetProject.id);
 
     if (error) {
       console.error("Failed to delete project:", error);
       return;
     }
 
-    setProjects(projects.filter((item) => item.id !== project.id));
-    setSelectedProjectIndex(0);
+    setProjects((currentProjects) => {
+      const nextProjects = currentProjects.filter(
+        (item) => item.id !== targetProject.id
+      );
+
+      if (nextProjects.length === 0) {
+        setSelectedProjectIndex(0);
+      } else if (index >= nextProjects.length) {
+        setSelectedProjectIndex(nextProjects.length - 1);
+      } else {
+        setSelectedProjectIndex(index);
+      }
+
+      return nextProjects;
+    });
+
     setSelectedStageIndex(0);
     setActiveProjectTab("brief");
+    setFeedbackText("");
+    setShowFinalHandoffModal(false);
+  }
+
+  async function deleteCurrentProject() {
+    if (selectedProjectIndex < 0) return;
+
+    await deleteProject(selectedProjectIndex);
   }
 
   async function saveBrief(
@@ -643,6 +661,7 @@ export function useProductionProjects() {
     setShowFinalHandoffModal,
     createNewProject,
     renameCurrentProject,
+    deleteProject,
     deleteCurrentProject,
     saveBrief,
     approveBrief,
